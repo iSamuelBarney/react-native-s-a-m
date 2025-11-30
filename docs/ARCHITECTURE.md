@@ -29,6 +29,42 @@ S.A.M is built as a Nitro Module with a C++ core for maximum performance. It pro
 2. **Simplicity** - Clean API with React hooks for declarative usage
 3. **Flexibility** - Support for patterns, conditions, throttle/debounce
 4. **Type Safety** - Full TypeScript support with generics
+5. **Security** - Built-in Keychain/Keystore integration with biometrics
+
+### Storage Types Overview
+
+```
+┌─────────────────────────────────────────────────────────────────────────────┐
+│                              S.A.M Storage System                            │
+├─────────────────────────────────────────────────────────────────────────────┤
+│                                                                             │
+│  ┌─────────────────────┐  ┌─────────────────────┐  ┌─────────────────────┐ │
+│  │    WARM STORAGE     │  │    COLD STORAGE     │  │   SECURE STORAGE    │ │
+│  │       (MMKV)        │  │      (SQLite)       │  │   (Keychain/Store)  │ │
+│  ├─────────────────────┤  ├─────────────────────┤  ├─────────────────────┤ │
+│  │                     │  │                     │  │                     │ │
+│  │ • Fast key-value    │  │ • Relational data   │  │ • Credentials       │ │
+│  │ • In-memory mapped  │  │ • SQL queries       │  │ • API tokens        │ │
+│  │ • Pattern matching  │  │ • Table listeners   │  │ • Encryption keys   │ │
+│  │ • Sync operations   │  │ • Row conditions    │  │ • Biometric auth    │ │
+│  │                     │  │                     │  │                     │ │
+│  ├─────────────────────┤  ├─────────────────────┤  ├─────────────────────┤ │
+│  │ Hook: useWarm()     │  │ Hook: useCold()     │  │ Hook: useSecure()   │ │
+│  │ API: SideFx.*MMKV() │  │ API: SideFx.*SQL()  │  │ API: SecureStorage  │ │
+│  └─────────────────────┘  └─────────────────────┘  └─────────────────────┘ │
+│                                                                             │
+│  ┌─────────────────────────────────────────────────────────────────────┐   │
+│  │                         MFE STATE TRACKING                           │   │
+│  ├─────────────────────────────────────────────────────────────────────┤   │
+│  │ • Micro-frontend lifecycle states (loading → loaded → mounted)      │   │
+│  │ • Version tracking and load time metrics                            │   │
+│  │ • Error state management                                            │   │
+│  │ • Hooks: useMFEState(), useMFEStates(), useMFEControl()             │   │
+│  │ • Backed by dedicated MMKV instance (sam.mfe)                       │   │
+│  └─────────────────────────────────────────────────────────────────────┘   │
+│                                                                             │
+└─────────────────────────────────────────────────────────────────────────────┘
+```
 
 ### Technology Stack
 
@@ -38,43 +74,47 @@ S.A.M is built as a Nitro Module with a C++ core for maximum performance. It pro
 | JavaScript API | TypeScript |
 | Native Bridge | Nitro Modules |
 | Core Implementation | C++ |
-| Storage | MMKV, SQLite |
+| Warm Storage | MMKV (memory-mapped) |
+| Cold Storage | SQLite |
+| Secure Storage | iOS Keychain / Android Keystore via react-native-keychain |
 
 ---
 
 ## Layer Architecture
 
 ```
-┌─────────────────────────────────────────────────────────────┐
-│                     React Components                         │
-│                                                              │
-│   useWarm()        useCold()        useStorage()            │
-└──────────────────────────┬───────────────────────────────────┘
-                           │
-┌──────────────────────────┴───────────────────────────────────┐
-│                    JavaScript API                            │
-│                                                              │
-│   SideFx.addListener()   SideFx.setMMKV()                   │
-│   SideFx.removeListener() SideFx.querySQLite()              │
-└──────────────────────────┬───────────────────────────────────┘
-                           │
-┌──────────────────────────┴───────────────────────────────────┐
-│                    Nitro Bridge                              │
-│                                                              │
-│   HybridObject<SideFx>                                      │
-│   NitroModules.createHybridObject('SideFx')                 │
-└──────────────────────────┬───────────────────────────────────┘
-                           │
-┌──────────────────────────┴───────────────────────────────────┐
-│                    C++ Core                                  │
-│                                                              │
-│   HybridSideFx                                              │
-│   ├── ListenerManager                                       │
-│   ├── MMKVAdapter                                           │
-│   ├── SQLiteAdapter                                         │
-│   ├── ConditionEvaluator                                    │
-│   └── PatternMatcher                                        │
-└──────────────────────────────────────────────────────────────┘
+┌─────────────────────────────────────────────────────────────────────────┐
+│                           React Components                               │
+│                                                                          │
+│   useWarm()    useCold()    useStorage()    useSecure()    useMFEState()│
+└─────────────────────────────────┬────────────────────────────────────────┘
+                                  │
+┌─────────────────────────────────┴────────────────────────────────────────┐
+│                          JavaScript API                                   │
+│                                                                          │
+│  ┌─────────────────┐  ┌─────────────────┐  ┌─────────────────┐          │
+│  │    SideFx       │  │  SecureStorage  │  │   MFE Registry  │          │
+│  │  (Storage API)  │  │  (Keychain API) │  │  (State Track)  │          │
+│  └────────┬────────┘  └────────┬────────┘  └────────┬────────┘          │
+└───────────┼────────────────────┼────────────────────┼────────────────────┘
+            │                    │                    │
+┌───────────┴────────────────────┴────────────────────┴────────────────────┐
+│                          Native Bridge Layer                              │
+│                                                                          │
+│  ┌─────────────────┐  ┌─────────────────┐  ┌─────────────────┐          │
+│  │  Nitro Modules  │  │ react-native-   │  │    MMKV via     │          │
+│  │  (HybridSideFx) │  │   keychain      │  │     SideFx      │          │
+│  └────────┬────────┘  └────────┬────────┘  └────────┬────────┘          │
+└───────────┼────────────────────┼────────────────────┼────────────────────┘
+            │                    │                    │
+┌───────────┴────────────────────┴────────────────────┴────────────────────┐
+│                          Platform Storage                                 │
+│                                                                          │
+│  ┌─────────────────┐  ┌─────────────────┐  ┌─────────────────┐          │
+│  │  MMKV + SQLite  │  │  iOS Keychain   │  │ Android Keystore│          │
+│  │   (C++ Core)    │  │ (Secure Enclave)│  │ (Hardware TEE)  │          │
+│  └─────────────────┘  └─────────────────┘  └─────────────────┘          │
+└──────────────────────────────────────────────────────────────────────────┘
 ```
 
 ---
@@ -82,33 +122,43 @@ S.A.M is built as a Nitro Module with a C++ core for maximum performance. It pro
 ## Component Diagram
 
 ```
-                    ┌─────────────────┐
-                    │  React Hook     │
-                    │  (useWarm)      │
-                    └────────┬────────┘
-                             │
-                    ┌────────▼────────┐
-                    │  SideFx API     │
-                    │  (JavaScript)   │
-                    └────────┬────────┘
-                             │
-         ┌───────────────────┼───────────────────┐
-         │                   │                   │
-┌────────▼────────┐ ┌────────▼────────┐ ┌────────▼────────┐
-│  Callback Map   │ │  Nitro Bridge   │ │  Global Handler │
-│  (JS)           │ │                 │ │  __SAM_onChange │
-└─────────────────┘ └────────┬────────┘ └─────────────────┘
-                             │
-                    ┌────────▼────────┐
-                    │  HybridSideFx   │
-                    │  (C++)          │
-                    └────────┬────────┘
-                             │
-         ┌───────────────────┼───────────────────┐
-         │                   │                   │
-┌────────▼────────┐ ┌────────▼────────┐ ┌────────▼────────┐
-│  MMKV Adapter   │ │  SQLite Adapter │ │  Listener Store │
-└─────────────────┘ └─────────────────┘ └─────────────────┘
+                              ┌─────────────────────────────────────────┐
+                              │            React Hooks                   │
+                              │                                         │
+                              │  useWarm   useCold   useSecure   useMFE │
+                              └──────────────────┬──────────────────────┘
+                                                 │
+                    ┌────────────────────────────┼────────────────────────────┐
+                    │                            │                            │
+           ┌────────▼────────┐          ┌────────▼────────┐          ┌────────▼────────┐
+           │    SideFx       │          │  SecureStorage  │          │  MFE Registry   │
+           │  (Storage API)  │          │  (Keychain)     │          │  (State Track)  │
+           └────────┬────────┘          └────────┬────────┘          └────────┬────────┘
+                    │                            │                            │
+     ┌──────────────┼──────────────┐             │                            │
+     │              │              │             │                            │
+┌────▼────┐  ┌──────▼──────┐  ┌────▼────┐  ┌─────▼─────┐              ┌───────▼───────┐
+│Callback │  │Nitro Bridge │  │ Global  │  │  react-   │              │  MMKV Storage │
+│  Map    │  │             │  │ Handler │  │  native-  │              │  (sam.mfe)    │
+│  (JS)   │  │             │  │__SAM_on │  │  keychain │              │               │
+└─────────┘  └──────┬──────┘  │ Change  │  └─────┬─────┘              └───────────────┘
+                    │         └─────────┘        │
+           ┌────────▼────────┐                   │
+           │  HybridSideFx   │                   │
+           │  (C++)          │                   │
+           └────────┬────────┘                   │
+                    │                            │
+     ┌──────────────┼──────────────┐             │
+     │              │              │             │
+┌────▼────┐  ┌──────▼──────┐  ┌────▼────┐  ┌─────▼─────┐
+│  MMKV   │  │   SQLite    │  │Listener │  │   iOS     │
+│ Adapter │  │   Adapter   │  │  Store  │  │ Keychain  │
+└─────────┘  └─────────────┘  └─────────┘  └───────────┘
+                                                 │
+                                           ┌─────▼─────┐
+                                           │  Android  │
+                                           │ Keystore  │
+                                           └───────────┘
 ```
 
 ---
@@ -602,6 +652,7 @@ packages/react-native-s-a-m/
 │   ├── API.md             # Complete API reference
 │   ├── HOOKS.md           # React hooks documentation
 │   ├── CONDITIONS.md      # Condition types reference
+│   ├── SECURE_STORAGE.md  # iOS Keychain / Android Keystore guide
 │   └── ARCHITECTURE.md    # This file
 ├── nitro.json             # Nitro configuration
 ├── package.json

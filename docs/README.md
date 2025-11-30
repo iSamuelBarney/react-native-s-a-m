@@ -1,8 +1,12 @@
-# S.A.M - State Awareness Manager
+<p align="center">
+  <img src="../assets/logo.jpg" alt="S.A.M Logo" width="120" />
+</p>
 
-> Reactive listeners for MMKV and SQLite storage in React Native
+# S.A.M - Surface-to-Air Missile for State Management
 
-S.A.M (State Awareness Manager) is a high-performance Nitro Module that provides reactive listeners for storage changes in React Native applications. It enables your components to automatically respond to changes in MMKV (warm storage) and SQLite (cold storage) without polling or manual refresh.
+> *"State that persists. Storage that reacts."*
+
+S.A.M is a high-performance Nitro Module that provides reactive listeners for storage changes in React Native applications. It enables your components to automatically respond to changes in MMKV (warm storage), SQLite (cold storage), and Secure Storage (Keychain/Keystore) without polling or manual refresh.
 
 ## Table of Contents
 
@@ -31,8 +35,8 @@ pnpm add react-native-s-a-m
 
 ### Requirements
 
-- React Native >= 0.76.0
-- React >= 18.0.0
+- React Native >= 0.82.0
+- React >= 19.0.0
 - react-native-nitro-modules >= 0.31.0
 
 ### Optional Dependencies
@@ -559,6 +563,7 @@ SideFx.setDebugMode(true);
 - [API Reference](./API.md) - Complete API documentation
 - [React Hooks](./HOOKS.md) - Detailed hooks documentation
 - [Conditions](./CONDITIONS.md) - Conditional trigger reference
+- [Secure Storage](./SECURE_STORAGE.md) - iOS Keychain / Android Keystore guide
 - [Architecture](./ARCHITECTURE.md) - Technical architecture overview
 
 ## License
