@@ -6,6 +6,9 @@ tsconfig.json
 node_modules/
 .git/
 .github/
+.turbo/
+.mason/
+example/
 
 # IDE
 .vscode/
@@ -14,3 +17,11 @@ node_modules/
 # Misc
 *.log
 .DS_Store
+
+# Test files
+__tests__/
+__mocks__/
+*.test.ts
+*.test.js
+*.spec.ts
+*.spec.js
