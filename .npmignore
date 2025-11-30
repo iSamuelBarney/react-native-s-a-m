@@ -1,0 +1,16 @@
+# Source files (only ship built files)
+src/
+tsconfig.json
+
+# Development
+node_modules/
+.git/
+.github/
+
+# IDE
+.vscode/
+.idea/
+
+# Misc
+*.log
+.DS_Store

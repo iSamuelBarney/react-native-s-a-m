@@ -1,0 +1,17 @@
+{
+  "$schema": "https://nitro.margelo.com/nitro.schema.json",
+  "cxxNamespace": ["sam"],
+  "ios": {
+    "iosModuleName": "ReactNativeSAM"
+  },
+  "android": {
+    "androidNamespace": ["com", "sam"],
+    "androidCxxLibName": "ReactNativeSAM"
+  },
+  "autolinking": {
+    "SideFx": {
+      "cpp": "HybridSideFx"
+    }
+  },
+  "ignorePaths": ["node_modules"]
+}

@@ -1,0 +1,147 @@
+{
+  "name": "react-native-s-a-m",
+  "description": "S.A.M - State Awareness Manager patterns and examples",
+  "version": "1.0.0",
+  "patterns": [
+    {
+      "id": "mmkv-init-ios",
+      "name": "MMKV Initialization (iOS)",
+      "category": "initialization",
+      "description": "Initialize MMKV on iOS - path is auto-detected",
+      "markdown": "## MMKV Initialization (iOS)\n\nOn iOS, MMKV path is automatically detected as `Library/mmkv`. No additional setup required.\n\n```typescript\nimport { SideFx } from 'react-native-s-a-m';\n\n// Initialize default instance\nSideFx.initializeMMKV();\n\n// Initialize named instances\nSideFx.initializeMMKV('user-data');\nSideFx.initializeMMKV('sam-mfe-registry');\n```"
+    },
+    {
+      "id": "mmkv-init-android",
+      "name": "MMKV Initialization (Android)",
+      "category": "initialization",
+      "description": "Initialize MMKV on Android - requires setting root path first",
+      "markdown": "## MMKV Initialization (Android)\n\nOn Android, you must set the MMKV root path before initialization.\n\n```typescript\nimport { SideFx } from 'react-native-s-a-m';\nimport { Platform } from 'react-native';\n\nif (Platform.OS === 'android') {\n  // Set path to your app's files directory + '/mmkv'\n  SideFx.setMMKVRootPath('/data/data/com.yourapp/files/mmkv');\n}\n\n// Now initialize instances\nSideFx.initializeMMKV();\nSideFx.initializeMMKV('user-data');\n```"
+    },
+    {
+      "id": "mmkv-init-cross-platform",
+      "name": "MMKV Cross-Platform Initialization",
+      "category": "initialization",
+      "description": "Initialize MMKV with cross-platform support",
+      "markdown": "## Cross-Platform MMKV Setup\n\nHandle both iOS and Android in a single initialization flow.\n\n```typescript\nimport { SideFx } from 'react-native-s-a-m';\nimport { Platform } from 'react-native';\n\nexport function initializeStorage() {\n  // Android requires path setup\n  if (Platform.OS === 'android') {\n    SideFx.setMMKVRootPath('/data/data/com.yourapp/files/mmkv');\n  }\n  // iOS auto-detects path\n  \n  // Initialize instances\n  const result = SideFx.initializeMMKV('default');\n  if (!result.success) {\n    console.error('MMKV init failed:', result.error);\n  }\n}\n```"
+    },
+    {
+      "id": "mmkv-basic-ops",
+      "name": "MMKV Basic Operations",
+      "category": "storage",
+      "description": "Basic MMKV read/write operations",
+      "markdown": "## MMKV Basic Operations\n\nSet, get, and delete values in MMKV storage.\n\n```typescript\nimport { SideFx } from 'react-native-s-a-m';\n\n// Set values (string, number, boolean)\nSideFx.setMMKV('user.name', 'John Doe');\nSideFx.setMMKV('user.age', 30);\nSideFx.setMMKV('user.premium', true);\n\n// Get values\nconst name = SideFx.getMMKV('user.name');  // 'John Doe'\nconst age = SideFx.getMMKV('user.age');    // 30\nconst isPremium = SideFx.getMMKV('user.premium');  // true\n\n// Delete a key\nSideFx.deleteMMKV('user.name');\n\n// Use named instances\nSideFx.setMMKV('api.token', 'secret123', 'secure-store');\nconst token = SideFx.getMMKV('api.token', 'secure-store');\n```"
+    },
+    {
+      "id": "sqlite-init",
+      "name": "SQLite Initialization",
+      "category": "initialization",
+      "description": "Initialize SQLite database",
+      "markdown": "## SQLite Initialization\n\nInitialize SQLite database for cold storage.\n\n```typescript\nimport { SideFx } from 'react-native-s-a-m';\nimport RNFS from 'react-native-fs';\n\n// Get database path\nconst dbPath = `${RNFS.DocumentDirectoryPath}/app.db`;\n\n// Initialize database\nconst result = SideFx.initializeSQLite('app-db', dbPath);\nif (!result.success) {\n  console.error('SQLite init failed:', result.error);\n}\n\n// Check if initialized\nif (SideFx.isSQLiteInitialized('app-db')) {\n  console.log('Database ready');\n}\n```"
+    },
+    {
+      "id": "sqlite-basic-ops",
+      "name": "SQLite Basic Operations",
+      "category": "storage",
+      "description": "Basic SQLite CRUD operations",
+      "markdown": "## SQLite Basic Operations\n\nExecute SQL statements and queries.\n\n```typescript\nimport { SideFx } from 'react-native-s-a-m';\n\n// Create table\nSideFx.executeSQLite(`\n  CREATE TABLE IF NOT EXISTS users (\n    id INTEGER PRIMARY KEY AUTOINCREMENT,\n    name TEXT NOT NULL,\n    email TEXT UNIQUE,\n    created_at DATETIME DEFAULT CURRENT_TIMESTAMP\n  )\n`);\n\n// Insert with parameters\nSideFx.executeSQLite(\n  'INSERT INTO users (name, email) VALUES (?, ?)',\n  ['John Doe', 'john@example.com']\n);\n\n// Query with type\ninterface User {\n  id: number;\n  name: string;\n  email: string;\n}\n\nconst users = SideFx.querySQLite<User[]>('SELECT * FROM users');\nconst user = SideFx.querySQLite<User[]>(\n  'SELECT * FROM users WHERE id = ?',\n  [1]\n);\n\n// Update\nSideFx.executeSQLite(\n  'UPDATE users SET name = ? WHERE id = ?',\n  ['Jane Doe', 1]\n);\n\n// Delete\nSideFx.executeSQLite('DELETE FROM users WHERE id = ?', [1]);\n```"
+    },
+    {
+      "id": "usewarm-hook",
+      "name": "useWarm Hook",
+      "category": "hooks",
+      "description": "Watch MMKV changes with React hook",
+      "markdown": "## useWarm Hook\n\nWatch MMKV (warm storage) changes reactively.\n\n```typescript\nimport { useWarm } from 'react-native-s-a-m';\n\nfunction UserProfile() {\n  const { isListening, pause, resume, refresh } = useWarm(\n    {\n      keys: ['user.name', 'user.email'],\n      patterns: ['user.*'],  // Watch all user.* keys\n      options: {\n        fireImmediately: true,\n        debounceMs: 300\n      }\n    },\n    (event) => {\n      console.log(`${event.key} changed to ${event.newValue}`);\n    }\n  );\n\n  return (\n    <View>\n      <Text>Listening: {isListening ? 'Yes' : 'No'}</Text>\n      <Button title=\"Pause\" onPress={pause} />\n      <Button title=\"Resume\" onPress={resume} />\n    </View>\n  );\n}\n```"
+    },
+    {
+      "id": "usecold-hook",
+      "name": "useCold Hook",
+      "category": "hooks",
+      "description": "Watch SQLite changes with React hook",
+      "markdown": "## useCold Hook\n\nWatch SQLite (cold storage) changes reactively.\n\n```typescript\nimport { useCold } from 'react-native-s-a-m';\n\nfunction OrdersList() {\n  const { isListening, lastChange, refresh } = useCold(\n    {\n      database: 'app-db',\n      table: 'orders',\n      columns: ['status', 'total'],\n      operations: ['INSERT', 'UPDATE', 'DELETE']\n    },\n    (event) => {\n      console.log(`Order ${event.rowId} ${event.operation}`);\n      // Refresh your data\n    }\n  );\n\n  return (\n    <View>\n      <Text>Last change: {lastChange?.timestamp}</Text>\n      <Button title=\"Refresh\" onPress={refresh} />\n    </View>\n  );\n}\n```"
+    },
+    {
+      "id": "usestorage-hook",
+      "name": "useStorage Hook",
+      "category": "hooks",
+      "description": "Watch both MMKV and SQLite with correlation",
+      "markdown": "## useStorage Hook\n\nWatch both MMKV and SQLite with optional correlation.\n\n```typescript\nimport { useStorage } from 'react-native-s-a-m';\n\nfunction UserOrders() {\n  const { lastSource, isListening } = useStorage(\n    {\n      warm: { keys: ['auth.userId'] },\n      cold: {\n        query: 'SELECT * FROM orders WHERE user_id = ?',\n        queryParams: []\n      },\n      correlation: {\n        warmKey: 'auth.userId',\n        coldParam: 'user_id'\n      },\n      logic: 'OR'  // Fire on either change\n    },\n    (event) => {\n      console.log(`Change from ${event.source}`);\n    }\n  );\n\n  return <Text>Source: {lastSource}</Text>;\n}\n```"
+    },
+    {
+      "id": "mfe-tracking-basic",
+      "name": "MFE State Tracking",
+      "category": "mfe",
+      "description": "Track micro-frontend loading states",
+      "markdown": "## MFE State Tracking\n\nTrack micro-frontend loading states through MMKV.\n\n```typescript\nimport {\n  initializeMFERegistry,\n  markMFELoading,\n  markMFELoaded,\n  markMFEMounted,\n  markMFEUnmounted,\n  markMFEError,\n  getMFEState,\n  getMFEMetadata\n} from 'react-native-s-a-m';\nimport { Platform } from 'react-native';\n\n// Initialize at app start\nif (Platform.OS === 'android') {\n  initializeMFERegistry('/data/data/com.yourapp/files/mmkv');\n} else {\n  initializeMFERegistry();\n}\n\n// Track MFE lifecycle\nmarkMFELoading('checkout-mfe');\n\ntry {\n  // Load MFE...\n  markMFELoaded('checkout-mfe', '1.2.0');\n  markMFEMounted('checkout-mfe');\n} catch (error) {\n  markMFEError('checkout-mfe', error.message);\n}\n\n// On unmount\nmarkMFEUnmounted('checkout-mfe', true);  // keepLoaded = true\n\n// Query state\nconst state = getMFEState('checkout-mfe');  // 'loaded'\nconst meta = getMFEMetadata('checkout-mfe');\n// { state: 'loaded', version: '1.2.0', loadedAt: 1234567890 }\n```"
+    },
+    {
+      "id": "mfe-react-hooks",
+      "name": "MFE React Hooks",
+      "category": "mfe",
+      "description": "React hooks for MFE state observation",
+      "markdown": "## MFE React Hooks\n\nReact hooks for observing MFE states.\n\n```typescript\nimport { useMFEState, useMFEStates, useMFEControl } from 'react-native-s-a-m';\n\n// Watch single MFE\nfunction MFELoader({ mfeId }: { mfeId: string }) {\n  const { state, metadata, isLoading, isLoaded, isMounted, isError } = useMFEState(mfeId);\n\n  if (isLoading) return <Spinner />;\n  if (isError) return <ErrorView message={metadata?.errorMessage} />;\n  if (isMounted) return <Text>MFE Active v{metadata?.version}</Text>;\n  return <Text>State: {state}</Text>;\n}\n\n// Watch multiple MFEs\nfunction MFEDashboard() {\n  const { states, getState, getMounted, getLoading, getErrors } = \n    useMFEStates(['checkout', 'profile', 'cart']);\n\n  return (\n    <View>\n      <Text>Loading: {getLoading().join(', ')}</Text>\n      <Text>Mounted: {getMounted().join(', ')}</Text>\n      <Text>Errors: {getErrors().join(', ')}</Text>\n    </View>\n  );\n}\n\n// Control MFE state\nfunction MFEContainer({ mfeId }: { mfeId: string }) {\n  const { markMounted, markUnmounted } = useMFEControl(mfeId);\n\n  useEffect(() => {\n    markMounted();\n    return () => markUnmounted();\n  }, []);\n\n  return <MFEComponent />;\n}\n```"
+    },
+    {
+      "id": "mfe-registry",
+      "name": "MFE Registry Object",
+      "category": "mfe",
+      "description": "MFERegistry convenience object",
+      "markdown": "## MFE Registry Object\n\nConvenience object for MFE state management.\n\n```typescript\nimport { MFERegistry } from 'react-native-s-a-m';\n\n// Initialize\nMFERegistry.initialize();\n\n// Lifecycle methods\nMFERegistry.loading('my-mfe');\nMFERegistry.loaded('my-mfe', '2.0.0');\nMFERegistry.mounted('my-mfe');\nMFERegistry.unmounted('my-mfe', true);\nMFERegistry.error('my-mfe', 'Network error');\n\n// Query methods\nconst state = MFERegistry.getState('my-mfe');\nconst meta = MFERegistry.getMetadata('my-mfe');\nconst all = MFERegistry.getTracked(['mfe1', 'mfe2', 'mfe3']);\n\n// Clear state\nMFERegistry.clear('my-mfe');\n```"
+    },
+    {
+      "id": "conditions-basic",
+      "name": "Conditional Triggers",
+      "category": "conditions",
+      "description": "Fire listeners only when conditions are met",
+      "markdown": "## Conditional Triggers\n\nFire listeners only when specific conditions are met.\n\n```typescript\nimport { useWarm } from 'react-native-s-a-m';\n\n// Only fire when value exists\nuseWarm({\n  keys: ['user.premium'],\n  conditions: [{ type: 'exists' }]\n}, callback);\n\n// Only fire when value equals something\nuseWarm({\n  keys: ['app.theme'],\n  conditions: [{ type: 'equals', value: 'dark' }]\n}, callback);\n\n// Only fire when number is greater than\nuseWarm({\n  keys: ['cart.total'],\n  conditions: [{ type: 'greaterThan', value: 100 }]\n}, callback);\n\n// Only fire when string contains\nuseWarm({\n  keys: ['user.email'],\n  conditions: [{ type: 'contains', value: '@company.com' }]\n}, callback);\n\n// Only fire when value changes\nuseWarm({\n  keys: ['settings.notifications'],\n  conditions: [{ type: 'changed' }]\n}, callback);\n\n// Multiple conditions (all must match)\nuseWarm({\n  keys: ['order.status'],\n  conditions: [\n    { type: 'equals', value: 'completed' },\n    { type: 'changed' }\n  ]\n}, callback);\n```"
+    },
+    {
+      "id": "patterns-glob",
+      "name": "Glob Pattern Matching",
+      "category": "patterns",
+      "description": "Watch multiple keys with glob patterns",
+      "markdown": "## Glob Pattern Matching\n\nWatch multiple keys with glob patterns.\n\n```typescript\nimport { useWarm } from 'react-native-s-a-m';\n\n// Watch all user keys\nuseWarm({\n  patterns: ['user.*']\n}, callback);\n// Matches: user.name, user.email, user.avatar\n\n// Watch nested settings\nuseWarm({\n  patterns: ['settings.*.*']\n}, callback);\n// Matches: settings.theme.color, settings.notifications.enabled\n\n// Watch specific suffixes\nuseWarm({\n  patterns: ['*.enabled']\n}, callback);\n// Matches: notifications.enabled, darkMode.enabled\n\n// Combine patterns and exact keys\nuseWarm({\n  keys: ['app.version'],\n  patterns: ['user.*', 'settings.*.enabled']\n}, callback);\n```"
+    },
+    {
+      "id": "throttle-debounce",
+      "name": "Throttle and Debounce",
+      "category": "rate-limiting",
+      "description": "Control callback frequency",
+      "markdown": "## Throttle and Debounce\n\nControl callback frequency for performance.\n\n```typescript\nimport { useWarm } from 'react-native-s-a-m';\n\n// Debounce: Wait for inactivity\nuseWarm({\n  keys: ['search.query'],\n  options: {\n    debounceMs: 300  // Wait 300ms after last change\n  }\n}, (event) => {\n  // Called after user stops typing for 300ms\n  performSearch(event.newValue);\n});\n\n// Throttle: Limit frequency\nuseWarm({\n  keys: ['scroll.position'],\n  options: {\n    throttleMs: 100  // At most once per 100ms\n  }\n}, (event) => {\n  // Called at most 10 times per second\n  updateScrollIndicator(event.newValue);\n});\n\n// Combined throttle and debounce\nuseWarm({\n  keys: ['form.data'],\n  options: {\n    throttleMs: 1000,   // At most once per second\n    debounceMs: 500     // Wait for 500ms inactivity\n  }\n}, (event) => {\n  // Auto-save form data\n  saveFormData(event.newValue);\n});\n```"
+    },
+    {
+      "id": "secure-storage",
+      "name": "Secure Storage",
+      "category": "security",
+      "description": "iOS Keychain / Android Keystore integration",
+      "markdown": "## Secure Storage\n\niOS Keychain and Android Keystore integration.\n\n```typescript\nimport { SecureStorage } from 'react-native-s-a-m';\n\n// Check availability\nconst available = SecureStorage.isAvailable();\nconst biometry = await SecureStorage.getSupportedBiometryType();\n// 'FaceID' | 'TouchID' | 'Fingerprint' | null\n\n// Store credentials\nawait SecureStorage.set('admin', 'super-secret', {\n  service: 'my-app-auth',\n  accessible: 'AfterFirstUnlock',\n  requireBiometrics: true,\n  authenticationPrompt: {\n    title: 'Authenticate',\n    subtitle: 'Access your credentials'\n  }\n});\n\n// Retrieve credentials\nconst creds = await SecureStorage.get({ service: 'my-app-auth' });\nif (creds) {\n  console.log(creds.username, creds.password);\n}\n\n// Check if exists\nconst has = await SecureStorage.has({ service: 'my-app-auth' });\n\n// Delete credentials\nawait SecureStorage.delete({ service: 'my-app-auth' });\n\n// Server-specific credentials\nawait SecureStorage.setInternetCredentials(\n  'api.example.com',\n  'user',\n  'pass'\n);\nconst apiCreds = await SecureStorage.getInternetCredentials('api.example.com');\n```"
+    },
+    {
+      "id": "secure-hooks",
+      "name": "Secure Storage Hooks",
+      "category": "security",
+      "description": "React hooks for secure storage",
+      "markdown": "## Secure Storage Hooks\n\nReact hooks for secure credential management.\n\n```typescript\nimport { useSecure, useSecureCredentials } from 'react-native-s-a-m';\n\n// Full control with loading states\nfunction LoginScreen() {\n  const {\n    key,           // Current username\n    value,         // Current password\n    isLoading,\n    error,\n    isAvailable,\n    biometryType,\n    set,\n    get,\n    delete: remove\n  } = useSecure({\n    service: 'auth-service',\n    autoLoad: true\n  });\n\n  const handleLogin = async (user: string, pass: string) => {\n    const success = await set(user, pass);\n    if (success) {\n      navigation.navigate('Home');\n    }\n  };\n\n  if (isLoading) return <Spinner />;\n  if (!isAvailable) return <Text>Secure storage unavailable</Text>;\n\n  return (\n    <View>\n      <TextInput placeholder=\"Username\" />\n      <TextInput placeholder=\"Password\" secureTextEntry />\n      <Button title=\"Login\" onPress={handleLogin} />\n    </View>\n  );\n}\n\n// Simple credential watching\nfunction AuthProvider({ children }) {\n  const { credentials, isLoading } = useSecureCredentials({\n    service: 'auth-service'\n  });\n\n  return (\n    <AuthContext.Provider value={{ credentials }}>\n      {children}\n    </AuthContext.Provider>\n  );\n}\n```"
+    },
+    {
+      "id": "listener-management",
+      "name": "Listener Management",
+      "category": "advanced",
+      "description": "Low-level listener control",
+      "markdown": "## Listener Management\n\nLow-level listener control for advanced use cases.\n\n```typescript\nimport { SideFx } from 'react-native-s-a-m';\n\n// Add listener\nSideFx.addListener(\n  'my-listener',\n  {\n    mmkv: {\n      keys: ['user.name'],\n      patterns: ['settings.*'],\n      conditions: [{ type: 'exists' }]\n    },\n    options: {\n      fireImmediately: true,\n      debounceMs: 300,\n      debug: true\n    }\n  },\n  (event) => {\n    console.log('Change:', event.key, event.newValue);\n  }\n);\n\n// Check if listener exists\nif (SideFx.hasListener('my-listener')) {\n  console.log('Listener active');\n}\n\n// Pause and resume\nSideFx.pauseListener('my-listener');\nSideFx.resumeListener('my-listener');\n\n// Get listener info\nconst listeners = SideFx.getListeners();\nlisteners.forEach(l => {\n  console.log(`${l.id}: ${l.triggerCount} triggers`);\n});\n\n// Get specific listener\nconst info = SideFx.getListener('my-listener');\nconsole.log('Paused:', info?.isPaused);\n\n// Remove listener\nSideFx.removeListener('my-listener');\n\n// Remove all\nconst count = SideFx.removeAllListeners();\nconsole.log(`Removed ${count} listeners`);\n```"
+    },
+    {
+      "id": "debug-mode",
+      "name": "Debug Mode",
+      "category": "advanced",
+      "description": "Enable debug logging",
+      "markdown": "## Debug Mode\n\nEnable debug logging for troubleshooting.\n\n```typescript\nimport { SideFx } from 'react-native-s-a-m';\n\n// Enable debug mode\nSideFx.setDebugMode(true);\n\n// Check debug status\nif (SideFx.isDebugMode()) {\n  console.log('Debug logging enabled');\n}\n\n// Configure globally\nSideFx.configure({\n  debug: true,\n  maxListeners: 200\n});\n\n// Get version\nconsole.log('S.A.M version:', SideFx.getVersion());\n\n// Debug per-listener\nSideFx.addListener('debug-listener', {\n  mmkv: { keys: ['test.key'] },\n  options: { debug: true }  // Debug this listener only\n}, callback);\n```"
+    },
+    {
+      "id": "react-native-mmkv-compat",
+      "name": "react-native-mmkv Compatibility",
+      "category": "integration",
+      "description": "Using S.A.M alongside react-native-mmkv",
+      "markdown": "## react-native-mmkv Compatibility\n\nS.A.M can share storage with react-native-mmkv.\n\n```typescript\nimport { SideFx } from 'react-native-s-a-m';\nimport { MMKV } from 'react-native-mmkv';\n\n// react-native-mmkv instance\nconst mmkv = new MMKV({ id: 'shared-store' });\nmmkv.set('user.name', 'John');\n\n// S.A.M can read the same data!\nSideFx.initializeMMKV('shared-store');\nconst name = SideFx.getMMKV('user.name', 'shared-store');\n// Returns 'John'\n\n// Both libraries use the same MMKVCore\n// Storage is automatically shared\n\n// Listen for changes made by react-native-mmkv\nSideFx.addListener('mmkv-sync', {\n  mmkv: {\n    patterns: ['user.*'],\n    instanceId: 'shared-store'\n  }\n}, (event) => {\n  console.log('MMKV changed:', event.key);\n});\n\n// Write from S.A.M, read from react-native-mmkv\nSideFx.setMMKV('user.email', 'john@example.com', 'shared-store');\nconst email = mmkv.getString('user.email');\n// Returns 'john@example.com'\n```"
+    }
+  ]
+}
