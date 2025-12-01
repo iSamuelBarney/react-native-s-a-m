@@ -114,6 +114,7 @@ export function useNetwork(config: UseNetworkConfig = {}): UseNetworkResult {
   const [quality, setQuality] = useState<NetworkQuality>('unknown');
   const [internetQuality, setInternetQuality] = useState<InternetQuality>('unknown');
   const [latencyMs, setLatencyMs] = useState<number>(-1);
+  const [internetState, setInternetState] = useState<InternetState>('offline');
   const [isInternetReachable, setIsInternetReachable] = useState(false);
   const [isConnected, setIsConnected] = useState(false);
   const [cellularGeneration, setCellularGeneration] = useState<string | null>(null);
@@ -166,6 +167,11 @@ export function useNetwork(config: UseNetworkConfig = {}): UseNetworkResult {
       if (reachableValue !== null && typeof reachableValue === 'boolean') {
         setIsInternetReachable(reachableValue);
       }
+
+      const stateValue = Air.getWarm(Air.NETWORK_KEYS.INTERNET_STATE, Air.NETWORK_INSTANCE_ID);
+      if (stateValue !== null && typeof stateValue === 'string') {
+        setInternetState(stateValue as InternetState);
+      }
     } catch (error) {
       console.warn('[SAM] Failed to read network state:', error);
     }
@@ -213,6 +219,7 @@ export function useNetwork(config: UseNetworkConfig = {}): UseNetworkResult {
 
   return {
     state,
+    internetState,
     status,
     type,
     quality,

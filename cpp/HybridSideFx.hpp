@@ -862,6 +862,26 @@ public:
     updateInternetQualityWarmKeys();
   }
 
+  void setPingEndpoints(const std::vector<std::string>& endpoints) override {
+    std::lock_guard<std::mutex> lock(_mutex);
+
+    // Empty array resets to defaults
+    if (endpoints.empty()) {
+      _customPingEndpoints.clear();
+      if (_debugMode) {
+        logDebug("Reset ping endpoints to defaults");
+      }
+    } else {
+      _customPingEndpoints = endpoints;
+      if (_debugMode) {
+        logDebug("Set " + std::to_string(endpoints.size()) + " custom ping endpoints");
+      }
+    }
+
+    // Reset endpoint index to start fresh with new endpoints
+    _pingEndpointIndex = 0;
+  }
+
 private:
   // Internal listener entry structure
   struct ListenerEntry {
@@ -919,6 +939,7 @@ private:
   bool _useActivePing = false;  // If true, use active HTTP pings. If false, rely on passive observation.
   int _pingEndpointIndex = 0;  // Current endpoint index for round-robin
   bool _isCheckingOfflineRecovery = false;  // If true, we're in offline state doing recovery checks
+  std::vector<std::string> _customPingEndpoints;  // User-defined endpoints (empty = use defaults)
 
 #ifdef __APPLE__
   nw_path_monitor_t _networkPathMonitor = nullptr;
@@ -1332,9 +1353,15 @@ private:
 
   /**
    * Get list of ping endpoints for active internet quality checks
-   * Uses multiple endpoints to avoid dependency on any single service
+   * Returns custom endpoints if set, otherwise uses default endpoints
    */
   std::vector<std::string> getPingEndpoints() const {
+    // Use custom endpoints if set
+    if (!_customPingEndpoints.empty()) {
+      return _customPingEndpoints;
+    }
+
+    // Default endpoints - uses multiple to avoid dependency on any single service
     return {
       "https://www.google.com/generate_204",      // Google's connectivity check
       "https://www.apple.com/library/test/success.html",  // Apple's connectivity check

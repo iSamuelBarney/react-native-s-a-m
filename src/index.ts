@@ -110,4 +110,6 @@ export type {
   UseNetworkResult,
   UseNetworkConfig,
   NetworkQuality,
+  InternetQuality,
+  InternetState,
 } from './useNetwork';
