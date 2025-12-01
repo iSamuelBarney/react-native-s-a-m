@@ -113,3 +113,19 @@ export type {
   InternetQuality,
   InternetState,
 } from './useNetwork';
+
+// Constants for type-safe state comparisons
+export {
+  INTERNET_STATE,
+  APP_STATE,
+  NETWORK_QUALITY,
+  CONNECTION_TYPE,
+  INTERNET_QUALITY,
+} from './constants';
+export type {
+  InternetStateValue,
+  AppStateValue,
+  NetworkQualityValue,
+  ConnectionTypeValue,
+  InternetQualityValue,
+} from './constants';
