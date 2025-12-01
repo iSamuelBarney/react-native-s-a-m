@@ -27,15 +27,21 @@ export type InternetState = 'online' | 'offline' | 'online-weak';
  * Return value from useNetwork hook
  */
 export interface UseNetworkResult {
-  /** Current network state from native */
-  state: NetworkState | null;
   /**
-   * INTERNET_STATE - Simple state similar to APP_STATE.
-   * "offline" | "online" | "online-weak"
+   * INTERNET_STATE - SINGLE SOURCE OF TRUTH for internet connectivity.
+   * Similar to APP_STATE for app lifecycle.
    *
-   * Use this as the primary indicator for UI display.
+   * Values:
+   * - "offline" = No internet connectivity, don't make API calls
+   * - "online" = Good internet connectivity, safe to make API calls
+   * - "online-weak" = Connected but slow (latency > 300ms), warn users
+   *
+   * Use this as the primary indicator for all network decisions.
    */
   internetState: InternetState;
+
+  /** Current network state from native (for advanced use) */
+  state: NetworkState | null;
   /** Network status: "online" | "offline" | "unknown" */
   status: string;
   /** Connection type: "wifi" | "cellular" | "ethernet" | "none" | "unknown" */
@@ -46,17 +52,8 @@ export interface UseNetworkResult {
   internetQuality: InternetQuality;
   /** Internet latency in milliseconds (-1 if unknown/offline) */
   latencyMs: number;
-  /**
-   * Boolean for internet reachability.
-   * Use internetState for more granular state.
-   */
-  isInternetReachable: boolean;
-  /** Whether the device is connected (hardware level) */
+  /** Whether the device is connected (hardware level - WiFi/cellular attached) */
   isConnected: boolean;
-  /** Whether the device is online (network status) */
-  isOnline: boolean;
-  /** Whether the device is offline (network status) */
-  isOffline: boolean;
   /** Whether using WiFi */
   isWifi: boolean;
   /** Whether using cellular */
@@ -107,15 +104,14 @@ export interface UseNetworkConfig {
 export function useNetwork(config: UseNetworkConfig = {}): UseNetworkResult {
   const { autoStart = true, pollInterval = 1000 } = config;
 
-  // State
+  // State - all values come from Warm storage
   const [state, setState] = useState<NetworkState | null>(null);
+  const [internetState, setInternetState] = useState<InternetState>('offline'); // SINGLE SOURCE OF TRUTH
   const [status, setStatus] = useState<string>('unknown');
   const [type, setType] = useState<string>('unknown');
   const [quality, setQuality] = useState<NetworkQuality>('unknown');
   const [internetQuality, setInternetQuality] = useState<InternetQuality>('unknown');
   const [latencyMs, setLatencyMs] = useState<number>(-1);
-  const [internetState, setInternetState] = useState<InternetState>('offline');
-  const [isInternetReachable, setIsInternetReachable] = useState(false);
   const [isConnected, setIsConnected] = useState(false);
   const [cellularGeneration, setCellularGeneration] = useState<string | null>(null);
   const [isMonitoring, setIsMonitoring] = useState(false);
@@ -128,11 +124,17 @@ export function useNetwork(config: UseNetworkConfig = {}): UseNetworkResult {
     if (!isMounted.current) return;
 
     try {
-      // Get native state
+      // Get native state (for advanced use)
       const nativeState = Air.getNetworkState();
       setState(nativeState);
 
-      // Read from Warm storage for string values
+      // INTERNET_STATE is the SINGLE SOURCE OF TRUTH - read it first
+      const internetStateValue = Air.getWarm(Air.NETWORK_KEYS.INTERNET_STATE, Air.NETWORK_INSTANCE_ID);
+      if (internetStateValue !== null && typeof internetStateValue === 'string') {
+        setInternetState(internetStateValue as InternetState);
+      }
+
+      // Read other values from Warm storage
       const statusValue = Air.getWarm(Air.NETWORK_KEYS.STATUS, Air.NETWORK_INSTANCE_ID);
       const typeValue = Air.getWarm(Air.NETWORK_KEYS.TYPE, Air.NETWORK_INSTANCE_ID);
       const qualityValue = Air.getWarm(Air.NETWORK_KEYS.QUALITY, Air.NETWORK_INSTANCE_ID);
@@ -161,16 +163,6 @@ export function useNetwork(config: UseNetworkConfig = {}): UseNetworkResult {
       }
       if (latencyValue !== null && typeof latencyValue === 'number') {
         setLatencyMs(latencyValue);
-      }
-
-      const reachableValue = Air.getWarm(Air.NETWORK_KEYS.INTERNET_REACHABLE, Air.NETWORK_INSTANCE_ID);
-      if (reachableValue !== null && typeof reachableValue === 'boolean') {
-        setIsInternetReachable(reachableValue);
-      }
-
-      const stateValue = Air.getWarm(Air.NETWORK_KEYS.INTERNET_STATE, Air.NETWORK_INSTANCE_ID);
-      if (stateValue !== null && typeof stateValue === 'string') {
-        setInternetState(stateValue as InternetState);
       }
     } catch (error) {
       console.warn('[SAM] Failed to read network state:', error);
@@ -211,24 +203,22 @@ export function useNetwork(config: UseNetworkConfig = {}): UseNetworkResult {
     };
   }, [autoStart, pollInterval, readNetworkState]);
 
-  // Derived values
-  const isOnline = status === 'online';
-  const isOffline = status === 'offline';
+  // Derived values from type
   const isWifi = type === 'wifi';
   const isCellular = type === 'cellular';
 
   return {
-    state,
+    // SINGLE SOURCE OF TRUTH - check this first for all network decisions
     internetState,
+
+    // Additional details (for advanced use)
+    state,
     status,
     type,
     quality,
     internetQuality,
     latencyMs,
-    isInternetReachable,
     isConnected,
-    isOnline,
-    isOffline,
     isWifi,
     isCellular,
     cellularGeneration,
@@ -250,8 +240,8 @@ export function useNetwork(config: UseNetworkConfig = {}): UseNetworkResult {
  * ```
  */
 export function useIsOnline(): boolean {
-  const { isOnline } = useNetwork();
-  return isOnline;
+  const { internetState } = useNetwork();
+  return internetState !== 'offline';
 }
 
 /**

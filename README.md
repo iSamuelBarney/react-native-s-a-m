@@ -1,5 +1,5 @@
 <p align="center">
-  <img src="./assets/logo.jpg" alt="S.A.M Logo" width="150" />
+  <img src="./assets/logo.jpg" alt="S.A.M Logo" />
 </p>
 
 <h1 align="center">react-native-s-a-m</h1>
@@ -684,6 +684,8 @@ function UserOrders() {
 | `useWarm` | Watch Warm changes |
 | `useCold` | Watch Cold storage changes |
 | `useStorage` | Watch both with correlation |
+| `useNetwork` | Network state and quality |
+| `useIsOnline` | Simple online/offline boolean |
 | `useSecure` | Manage secure storage |
 | `useSecureCredentials` | Watch credential changes |
 
@@ -699,6 +701,62 @@ function UserOrders() {
 
 ---
 
+## Network Monitoring
+
+Native C++ network monitoring with reactive state stored in Warm storage.
+
+### Quick Start
+
+```typescript
+import { useNetwork } from 'react-native-s-a-m';
+
+function App() {
+  const { internetState } = useNetwork();
+
+  if (internetState === 'offline') {
+    return <OfflineBanner />;
+  }
+
+  if (internetState === 'online-weak') {
+    return <SlowConnectionWarning />;
+  }
+
+  return <MainApp />;
+}
+```
+
+### INTERNET_STATE — Single Source of Truth
+
+| Value | Description |
+|-------|-------------|
+| `"online"` | Good internet connectivity, safe to make API calls |
+| `"offline"` | No internet, don't make API calls |
+| `"online-weak"` | Connected but slow (latency > 300ms), warn users |
+
+### Production Integration
+
+```typescript
+// Report latency from your network calls
+const originalFetch = fetch;
+globalThis.fetch = async (input, init) => {
+  const startTime = Date.now();
+  try {
+    const response = await originalFetch(input, init);
+    Air.reportNetworkLatency(Date.now() - startTime);
+    return response;
+  } catch (error) {
+    if (isNetworkError(error)) {
+      Air.reportNetworkFailure();
+    }
+    throw error;
+  }
+};
+```
+
+For complete documentation including production patterns, custom endpoints, and performance considerations, see **[Network Monitoring Guide](./docs/NETWORK.md)**.
+
+---
+
 ## Documentation
 
 | Document | Description |
@@ -707,6 +765,7 @@ function UserOrders() {
 | [React Hooks](./docs/HOOKS.md) | Detailed hooks documentation |
 | [Conditions](./docs/CONDITIONS.md) | Conditional trigger reference |
 | [Secure Storage](./docs/SECURE_STORAGE.md) | Keychain/Keystore guide |
+| [Network Monitoring](./docs/NETWORK.md) | Network state and quality guide |
 | [MFE State Tracking](./docs/MFE.md) | Micro-frontend state tracking |
 | [Architecture](./docs/ARCHITECTURE.md) | Technical architecture overview |
 
@@ -721,6 +780,15 @@ pnpm build
 This will:
 1. Run `nitro-codegen` to generate platform-specific bindings
 2. Compile TypeScript to JavaScript
+
+---
+
+## Release automation
+
+- Conventional commits (`feat:`, `fix:`, `chore:` etc.) merged to `main` are picked up by release-please, which opens and auto-updates a release PR with the next version, changelog, and tags.
+- Publishing runs automatically on every published GitHub release via `.github/workflows/publish.yml`, building the package and running `npm publish`.
+- Secrets: add `NPM_TOKEN` (npm automation token with publish rights) to **Settings → Secrets and variables → Actions** so the publish job can authenticate.
+- If no `package-lock.json` is present, the workflow falls back to `npm install` before building.
 
 ---
 
