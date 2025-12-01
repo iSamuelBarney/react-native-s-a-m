@@ -79,7 +79,7 @@ Active mode periodically pings external endpoints to measure latency.
 - HTTP HEAD request every 10 seconds
 - ~100-500 bytes per request
 - Minimal battery impact in short sessions
-- Round-robins between Google and Apple endpoints
+- Round-robins between configured endpoints
 
 ```typescript
 // Enable active ping (typically in development only)
@@ -87,6 +87,32 @@ if (__DEV__) {
   Air.setActivePingMode(true);
 }
 ```
+
+#### Custom Ping Endpoints
+
+By default, S.A.M pings Google and Apple connectivity check endpoints. You can configure custom endpoints to ping your own servers instead:
+
+```typescript
+// Use your own API health endpoints
+Air.setPingEndpoints([
+  'https://api.myapp.com/health',
+  'https://api-backup.myapp.com/health',
+]);
+
+// Reset to default endpoints (Google, Apple)
+Air.setPingEndpoints([]);
+```
+
+**Requirements for custom endpoints:**
+- Should respond quickly (< 1s ideally)
+- Should be reliable and always available
+- Should support HEAD requests
+- Should return any 2xx status on success
+
+**Use cases for custom endpoints:**
+- Enterprise apps that can't ping external servers
+- Apps that need to verify connectivity to specific backends
+- Testing against staging/production API servers
 
 ### 2. Passive Mode (Production Recommended)
 
@@ -333,6 +359,21 @@ Toggle active ping mode.
 ```typescript
 Air.setActivePingMode(true);  // Enable active pings (10s interval)
 Air.setActivePingMode(false); // Passive mode (30s offline recovery only)
+```
+
+### Air.setPingEndpoints(endpoints: string[])
+
+Set custom endpoints for active ping mode.
+
+```typescript
+// Use custom endpoints
+Air.setPingEndpoints([
+  'https://api.myapp.com/health',
+  'https://cdn.myapp.com/ping',
+]);
+
+// Reset to defaults (Google, Apple)
+Air.setPingEndpoints([]);
 ```
 
 ### Air.reportNetworkLatency(latencyMs: number)

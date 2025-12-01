@@ -642,6 +642,36 @@ export const Air = {
   },
 
   /**
+   * Set custom endpoints for active ping mode.
+   *
+   * By default, S.A.M pings Google and Apple connectivity check endpoints.
+   * Use this to specify your own endpoints (e.g., your API server health endpoint).
+   *
+   * Requirements for custom endpoints:
+   * - Should respond quickly (< 1s ideally)
+   * - Should be reliable and always available
+   * - Should support HEAD requests
+   * - Should return any 2xx status on success
+   *
+   * @param endpoints Array of URLs to ping. Empty array resets to defaults.
+   *
+   * @example
+   * ```typescript
+   * // Use your own API health endpoint
+   * Air.setPingEndpoints([
+   *   'https://api.myapp.com/health',
+   *   'https://api-backup.myapp.com/health',
+   * ]);
+   *
+   * // Reset to default endpoints (Google, Apple)
+   * Air.setPingEndpoints([]);
+   * ```
+   */
+  setPingEndpoints(endpoints: string[]): void {
+    NativeSideFx.setPingEndpoints(endpoints);
+  },
+
+  /**
    * Network Warm storage instance ID
    * Use this when subscribing to network state changes via useWarm
    */
