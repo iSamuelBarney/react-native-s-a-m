@@ -5,21 +5,48 @@ S.A.M provides native C++ network monitoring with reactive state stored in Warm 
 ## Quick Start
 
 ```typescript
-import { Air, useNetwork } from 'react-native-s-a-m';
+import { useNetwork, INTERNET_STATE } from 'react-native-s-a-m';
 
 function App() {
   const { internetState } = useNetwork();
 
-  if (internetState === 'offline') {
+  if (internetState === INTERNET_STATE.OFFLINE) {
     return <OfflineBanner />;
   }
 
-  if (internetState === 'online-weak') {
+  if (internetState === INTERNET_STATE.ONLINE_WEAK) {
     return <SlowConnectionWarning />;
   }
 
   return <MainApp />;
 }
+```
+
+## Constants
+
+S.A.M exports constants for type-safe comparisons:
+
+```typescript
+import { INTERNET_STATE, NETWORK_QUALITY, CONNECTION_TYPE } from 'react-native-s-a-m';
+
+// Internet state
+INTERNET_STATE.ONLINE       // "online"
+INTERNET_STATE.OFFLINE      // "offline"
+INTERNET_STATE.ONLINE_WEAK  // "online-weak"
+
+// Network quality
+NETWORK_QUALITY.STRONG      // "strong"
+NETWORK_QUALITY.MEDIUM      // "medium"
+NETWORK_QUALITY.WEAK        // "weak"
+NETWORK_QUALITY.OFFLINE     // "offline"
+NETWORK_QUALITY.UNKNOWN     // "unknown"
+
+// Connection type
+CONNECTION_TYPE.WIFI        // "wifi"
+CONNECTION_TYPE.CELLULAR    // "cellular"
+CONNECTION_TYPE.ETHERNET    // "ethernet"
+CONNECTION_TYPE.NONE        // "none"
+CONNECTION_TYPE.UNKNOWN     // "unknown"
 ```
 
 ## Key Concepts
@@ -216,7 +243,7 @@ axios.interceptors.response.use(
 ```typescript
 // utils/queryClient.ts
 import { QueryClient } from '@tanstack/react-query';
-import { Air } from 'react-native-s-a-m';
+import { Air, INTERNET_STATE } from 'react-native-s-a-m';
 
 export const queryClient = new QueryClient({
   defaultOptions: {
@@ -229,10 +256,10 @@ export const queryClient = new QueryClient({
         );
 
         // Don't retry if offline
-        if (internetState === 'offline') return false;
+        if (internetState === INTERNET_STATE.OFFLINE) return false;
 
         // Limit retries on weak connection
-        if (internetState === 'online-weak') return failureCount < 1;
+        if (internetState === INTERNET_STATE.ONLINE_WEAK) return failureCount < 1;
 
         return failureCount < 3;
       },
@@ -244,20 +271,20 @@ export const queryClient = new QueryClient({
 ### Pattern 4: Conditional API Calls
 
 ```typescript
-import { Air, useNetwork } from 'react-native-s-a-m';
+import { useNetwork, INTERNET_STATE } from 'react-native-s-a-m';
 
 function DataFetcher() {
   const { internetState } = useNetwork();
 
   const fetchData = async () => {
     // Skip API call if offline
-    if (internetState === 'offline') {
+    if (internetState === INTERNET_STATE.OFFLINE) {
       // Return cached data or show offline message
       return getCachedData();
     }
 
     // Warn user about slow connection
-    if (internetState === 'online-weak') {
+    if (internetState === INTERNET_STATE.ONLINE_WEAK) {
       showToast('Slow connection detected, this may take a while...');
     }
 

@@ -699,6 +699,15 @@ function UserOrders() {
 | `SecureStorage.delete(options?)` | Delete credentials |
 | `SecureStorage.getSupportedBiometryType()` | Get biometry type |
 
+### Constants
+
+| Constant | Values | Description |
+|----------|--------|-------------|
+| `INTERNET_STATE` | `ONLINE`, `OFFLINE`, `ONLINE_WEAK` | Internet connectivity state |
+| `APP_STATE` | `ACTIVE`, `BACKGROUND`, `INACTIVE` | App lifecycle state |
+| `NETWORK_QUALITY` | `STRONG`, `MEDIUM`, `WEAK`, `OFFLINE`, `UNKNOWN` | Network quality |
+| `CONNECTION_TYPE` | `WIFI`, `CELLULAR`, `ETHERNET`, `NONE`, `UNKNOWN` | Connection type |
+
 ---
 
 ## Network Monitoring
@@ -708,16 +717,16 @@ Native C++ network monitoring with reactive state stored in Warm storage.
 ### Quick Start
 
 ```typescript
-import { useNetwork } from 'react-native-s-a-m';
+import { useNetwork, INTERNET_STATE } from 'react-native-s-a-m';
 
 function App() {
   const { internetState } = useNetwork();
 
-  if (internetState === 'offline') {
+  if (internetState === INTERNET_STATE.OFFLINE) {
     return <OfflineBanner />;
   }
 
-  if (internetState === 'online-weak') {
+  if (internetState === INTERNET_STATE.ONLINE_WEAK) {
     return <SlowConnectionWarning />;
   }
 
@@ -725,13 +734,13 @@ function App() {
 }
 ```
 
-### INTERNET_STATE — Single Source of Truth
+### INTERNET_STATE Constants
 
-| Value | Description |
-|-------|-------------|
-| `"online"` | Good internet connectivity, safe to make API calls |
-| `"offline"` | No internet, don't make API calls |
-| `"online-weak"` | Connected but slow (latency > 300ms), warn users |
+| Constant | Value | Description |
+|----------|-------|-------------|
+| `INTERNET_STATE.ONLINE` | `"online"` | Good connectivity, safe to make API calls |
+| `INTERNET_STATE.OFFLINE` | `"offline"` | No internet, don't make API calls |
+| `INTERNET_STATE.ONLINE_WEAK` | `"online-weak"` | Slow connection (latency > 300ms) |
 
 ### Production Integration
 
