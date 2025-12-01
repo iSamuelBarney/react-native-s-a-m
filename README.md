@@ -15,107 +15,37 @@
 <p align="center">
   <a href="https://www.npmjs.com/package/react-native-s-a-m"><img src="https://img.shields.io/npm/v/react-native-s-a-m.svg" alt="npm version" /></a>
   <a href="https://www.npmjs.com/package/react-native-s-a-m"><img src="https://img.shields.io/npm/dm/react-native-s-a-m.svg" alt="npm downloads" /></a>
-  <a href="https://github.com/module-federation/metro/blob/main/LICENSE"><img src="https://img.shields.io/npm/l/react-native-s-a-m.svg" alt="license" /></a>
+  <a href="https://github.com/iSamuelBarney/react-native-s-a-m/blob/main/LICENSE"><img src="https://img.shields.io/npm/l/react-native-s-a-m.svg" alt="license" /></a>
 </p>
 
 ---
 
 A high-performance Nitro Module for React Native that provides reactive listeners for Warm and Cold storage changes. Enables automatic component updates when storage changes — no polling, no boilerplate, just reactive persistence.
 
-## Capabilities Checklist
-
-| Capability | Redux | Zustand | Jotai | MobX | Recoil | S.A.M |
-|:-----------|:-----:|:-------:|:-----:|:----:|:------:|:-----:|
-| React hooks API | ✅ | ✅ | ✅ | ✅ | ✅ | ✅ |
-| Persistent storage built-in | | | | | | ✅ |
-| TypeScript support | ✅ | ✅ | ✅ | ✅ | ✅ | ✅ |
-| Secure storage (Keychain/Keystore) | | | | | | ✅ |
-| Atomic updates | | | ✅ | | ✅ | ✅ |
-| Biometric authentication | | | | | | ✅ |
-| No provider/wrapper required | | ✅ | ✅ | | | ✅ |
-| Cold storage reactive queries | | | | | | ✅ |
-| Fine-grained reactivity | | | ✅ | ✅ | ✅ | ✅ |
-| Key pattern matching (`user.*`) | | | | | | ✅ |
-| Minimal boilerplate | | ✅ | ✅ | | | ✅ |
-| Conditional triggers | | | | | | ✅ |
-| Computed/derived state | ✅ | ✅ | ✅ | ✅ | ✅ | ✅ |
-| Native C++ performance | | | | | | ✅ |
-| Async actions built-in | | ✅ | ✅ | ✅ | ✅ | ✅ |
-| Zero hydration delay | | | | | | ✅ |
-| Immer integration | ✅ | ✅ | ✅ | | | ✅ |
-| Cross-instance sync | | | | | | ✅ |
-| Built-in debounce/throttle | | | | | | ✅ |
-| Observable patterns | | | | ✅ | | ✅ |
-| Warm + Cold storage unified | | | | | | ✅ |
-| Selector support | ✅ | ✅ | ✅ | ✅ | ✅ | ✅ |
-| Zero JS bundle overhead | | | | | | ✅ |
-| React Native native-first | | | | ✅ | | ✅ |
-
-> **All the features you expect from modern state managers, plus 14 exclusive capabilities for React Native.**
-
 ## Why S.A.M?
 
-### The Problem with Traditional State Management
+Traditional state managers (Redux, Zustand, Jotai, MobX) were built for web apps where state lives in memory. React Native apps need **persistent state**, **secure storage**, **relational data**, and **native performance**. S.A.M unifies all of this.
 
-Redux, Zustand, Jotai, and MobX were designed for **web apps** where state lives in memory. But React Native apps need:
+### S.A.M Exclusive Features
 
-- **Persistent state** that survives app restarts
-- **Secure storage** for tokens and credentials
-- **Relational data** that belongs in SQLite
-- **Native performance** for 60fps scrolling
+- **Zero JS bundle** — Native C++ via Nitro
+- **Built-in persistence** — No middleware or adapters
+- **Secure storage** — Keychain/Keystore with biometrics
+- **Reactive SQLite** — Cold storage with change listeners
+- **Pattern matching** — Watch `user.*` or `settings.*.enabled`
+- **Conditional triggers** — Fire on `greaterThan`, `contains`, etc.
+- **Built-in debounce/throttle** — No extra setup
+- **Zero hydration delay** — Instant startup
 
-S.A.M was built from the ground up for **mobile-first, storage-native** state management.
-
-### Head-to-Head Comparison
-
-| Feature | Redux | Zustand | Jotai | MobX | S.A.M |
-|---------|-------|---------|-------|------|-------|
-| **Bundle Size** | ~15KB | ~1KB | ~1.2KB | ~7KB | 0KB (native) |
-| **Persistence** | redux-persist middleware | persist middleware | atomWithStorage | manual | **Built-in** |
-| **Setup Complexity** | High (actions, reducers, store) | Low | Low | Medium | **Zero config** |
-| **Secure Storage** | Separate library | Separate library | Separate library | Separate library | **Built-in Keychain/Keystore** |
-| **Biometric Auth** | DIY | DIY | DIY | DIY | **Built-in Face ID/Touch ID** |
-| **Cold Storage Support** | No | No | No | No | **Yes, reactive queries** |
-| **Pattern Matching** | No | No | No | No | **Yes (`user.*`, `settings.*.enabled`)** |
-| **Conditional Triggers** | No | No | No | No | **Yes (greaterThan, contains, etc.)** |
-| **Native Performance** | JS bridge | JS bridge | JS bridge | JS bridge | **C++ via Nitro** |
-| **Cross-Instance Sync** | Manual | Manual | Manual | Manual | **Automatic** |
-| **Debounce/Throttle** | Middleware | DIY | DIY | DIY | **Built-in** |
-| **React Native Focus** | Afterthought | Afterthought | Limited DevTools | Good | **Native-first** |
-
-### Why Storage-Native Wins
+### Storage-Native Approach
 
 ```typescript
-// ❌ Traditional: State + Persistence = Complexity
-// Redux: Create store → Add redux-persist → Configure storage → Handle rehydration
-// Zustand: Create store → Add persist middleware → Configure storage adapter
-// Result: State and storage are separate concerns you must sync
+// Traditional: State + Persistence = Complexity
+// Redux: store → redux-persist → storage adapter → rehydration
 
-// ✅ S.A.M: Storage IS State
-Air.setWarm('user.name', 'John');  // Stored AND reactive
-// That's it. Components automatically update. Persists across restarts.
+// S.A.M: Storage IS State
+Air.setWarm('user.name', 'John');  // Stored AND reactive — that's it
 ```
-
-### Real-World Scenarios
-
-| Scenario | Traditional Approach | S.A.M Approach |
-|----------|---------------------|----------------|
-| **Auth Token Storage** | AsyncStorage + state sync + separate secure storage lib | `SecureStorage.set()` with biometrics |
-| **Shopping Cart** | Redux slice + persist middleware + rehydration logic | `Air.setWarm('cart', data)` — done |
-| **Offline-First Data** | Complex saga/thunk + SQLite lib + manual sync | `useCold({ table: 'orders' })` — reactive |
-| **User Preferences** | Context + AsyncStorage + manual persistence | `useWarm({ keys: ['settings.*'] })` |
-| **Search with Debounce** | useState + useEffect + setTimeout cleanup | `options: { debounceMs: 300 }` |
-| **Feature Flags** | Separate system + polling | `conditions: [{ type: 'equals', value: true }]` |
-
-### Performance Advantage
-
-| Metric | JS State Managers | S.A.M |
-|--------|------------------|-------|
-| **Storage Read** | Async (JS → Bridge → Native → Bridge → JS) | Sync C++ direct access |
-| **Change Detection** | JS diffing algorithms | Native change notifications |
-| **Memory** | JS heap + serialized storage copy | Single native storage |
-| **Startup** | Rehydration delay | Instant (no hydration needed) |
-| **Large Lists** | Re-render entire tree risk | Fine-grained native updates |
 
 ## Features
 
@@ -783,21 +713,17 @@ For complete documentation including production patterns, custom endpoints, and 
 ## Building
 
 ```bash
-pnpm build
+npm run build       # Compile TypeScript
+npm run codegen     # Generate Nitro bindings
 ```
-
-This will:
-1. Run `nitro-codegen` to generate platform-specific bindings
-2. Compile TypeScript to JavaScript
 
 ---
 
-## Release automation
+## Release Automation
 
-- Conventional commits (`feat:`, `fix:`, `chore:` etc.) merged to `main` are picked up by release-please, which opens and auto-updates a release PR with the next version, changelog, and tags.
-- Publishing runs automatically on every published GitHub release via `.github/workflows/publish.yml`, building the package and running `npm publish`.
-- Secrets: add `NPM_TOKEN` (npm automation token with publish rights) to **Settings → Secrets and variables → Actions** so the publish job can authenticate.
-- If no `package-lock.json` is present, the workflow falls back to `npm install` before building.
+PRs merged to `main` automatically bump the patch version and publish to npm via GitHub Actions.
+
+Requires `NPM_TOKEN` secret in repository settings.
 
 ---
 
