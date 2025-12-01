@@ -1,9 +1,9 @@
 /**
  * S.A.M - State Awareness Manager
- * React Hooks for warm (MMKV) and cold (SQLite) storage
+ * React Hooks for warm and cold storage
  */
 import { useEffect, useRef, useState, useCallback, useMemo } from 'react';
-import { SideFx } from './SideFx';
+import { Air } from './SideFx';
 import type {
   UseWarmConfig,
   UseWarmResult,
@@ -14,7 +14,7 @@ import type {
   UseStorageConfig,
   UseStorageResult,
   ChangeEvent,
-  SQLiteOperation,
+  ColdOperation,
 } from './types';
 
 /**
@@ -25,16 +25,16 @@ function generateListenerId(prefix: string): string {
 }
 
 // ============================================================================
-// useWarm - MMKV (Warm Storage) Hook
+// useWarm - Warm Storage Hook
 // ============================================================================
 
 /**
- * React hook for watching MMKV (warm storage) changes
+ * React hook for watching warm storage changes
  *
  * Values are queried on-demand using get() methods, NOT stored as props.
  * The hook triggers re-renders when storage changes, then you query fresh values.
  *
- * @param config Configuration specifying MMKV instance and keys to watch
+ * @param config Configuration specifying Warm instance and keys to watch
  * @param callback Optional callback fired on changes
  * @returns Object with query methods and control functions
  *
@@ -96,7 +96,7 @@ export function useWarm<T = unknown>(
   // Memoize listener config to avoid unnecessary re-registrations
   const listenerConfig = useMemo(
     () => ({
-      mmkv: {
+      warm: {
         keys: config.keys,
         patterns: config.patterns,
         conditions: config.conditions,
@@ -118,13 +118,15 @@ export function useWarm<T = unknown>(
 
   useEffect(() => {
     const listenerId = listenerIdRef.current;
+    const instanceId = config.id ?? 'default';
 
-    // Auto-initialize MMKV if not already done
-    if (!SideFx.isMMKVInitialized(config.id)) {
-      SideFx.initializeMMKV(config.id);
+    // Only initialize non-default instances explicitly
+    // Default instance is auto-initialized lazily by Air
+    if (instanceId !== 'default' && !Air.isWarmInitialized(instanceId)) {
+      Air.initializeWarm(instanceId);
     }
 
-    const result = SideFx.addListener(
+    const result = Air.addListener(
       listenerId,
       listenerConfig,
       memoizedCallback
@@ -136,31 +138,31 @@ export function useWarm<T = unknown>(
     }
 
     return () => {
-      SideFx.removeListener(listenerId);
+      Air.removeListener(listenerId);
       setIsListening(false);
     };
   }, [listenerConfig, memoizedCallback, config.id]);
 
   const pause = useCallback(() => {
-    SideFx.pauseListener(listenerIdRef.current);
+    Air.pauseListener(listenerIdRef.current);
     setIsListening(false);
   }, []);
 
   const resume = useCallback(() => {
-    SideFx.resumeListener(listenerIdRef.current);
+    Air.resumeListener(listenerIdRef.current);
     setIsListening(true);
   }, []);
 
   const refresh = useCallback(() => {
-    SideFx.checkMMKVChanges();
+    Air.checkWarmChanges();
     forceUpdate({});
   }, []);
 
-  // Query function - gets value from MMKV on-demand
+  // Query function - gets value from Warm on-demand
   const get = useCallback(
     (key: string): T | undefined => {
       const instanceId = config.id ?? 'default';
-      const value = SideFx.getMMKV(key, instanceId);
+      const value = Air.getWarm(key, instanceId);
       return value as T | undefined;
     },
     [config.id]
@@ -171,7 +173,7 @@ export function useWarm<T = unknown>(
     const result: Record<string, T | undefined> = {};
     const instanceId = config.id ?? 'default';
     for (const key of config.keys) {
-      const value = SideFx.getMMKV(key, instanceId);
+      const value = Air.getWarm(key, instanceId);
       result[key] = value as T | undefined;
     }
     return result;
@@ -189,11 +191,11 @@ export function useWarm<T = unknown>(
 }
 
 // ============================================================================
-// useCold - SQLite (Cold Storage) Hook
+// useCold - Cold Storage Hook
 // ============================================================================
 
 /**
- * React hook for watching SQLite (cold storage) changes
+ * React hook for watching cold storage changes
  *
  * Data is queried on-demand using query() methods, NOT stored as props.
  * The hook triggers re-renders when storage changes, then you query fresh data.
@@ -235,7 +237,7 @@ export function useCold<T = unknown>(
   const [, forceUpdate] = useState({});
   const [isListening, setIsListening] = useState(false);
   const [lastChange, setLastChange] = useState<{
-    operation: SQLiteOperation | null;
+    operation: ColdOperation | null;
     rowId: number | null;
     timestamp: number | null;
   }>({ operation: null, rowId: null, timestamp: null });
@@ -243,7 +245,7 @@ export function useCold<T = unknown>(
   const memoizedCallback = useCallback(
     (event: ChangeEvent) => {
       setLastChange({
-        operation: event.operation as SQLiteOperation,
+        operation: event.operation as ColdOperation,
         rowId: event.rowId ?? null,
         timestamp: event.timestamp,
       });
@@ -256,7 +258,7 @@ export function useCold<T = unknown>(
           listenerId: event.listenerId,
           source: 'cold',
           table: event.table ?? '',
-          operation: event.operation as SQLiteOperation,
+          operation: event.operation as ColdOperation,
           rowId: event.rowId ?? 0,
           row: event.row,
           timestamp: event.timestamp,
@@ -268,7 +270,7 @@ export function useCold<T = unknown>(
 
   const listenerConfig = useMemo(
     () => ({
-      sqlite: {
+      cold: {
         table: config.table,
         columns: config.columns,
         operations: config.operations,
@@ -298,16 +300,17 @@ export function useCold<T = unknown>(
 
   useEffect(() => {
     const listenerId = listenerIdRef.current;
-    const dbName = config.database ?? 'default';
 
-    if (!SideFx.isSQLiteInitialized(dbName)) {
+    // Non-default databases still need explicit initialization
+    // Default database (sam_default) auto-initializes via Air methods
+    if (config.database && !Air.isColdInitialized(config.database)) {
       console.warn(
-        `[useCold] Database "${dbName}" not initialized. Call SideFx.initializeSQLite() first.`
+        `[useCold] Database "${config.database}" not initialized. Call Air.initializeCold() first.`
       );
       return;
     }
 
-    const result = SideFx.addListener(
+    const result = Air.addListener(
       listenerId,
       listenerConfig,
       memoizedCallback
@@ -319,36 +322,36 @@ export function useCold<T = unknown>(
     }
 
     return () => {
-      SideFx.removeListener(listenerId);
+      Air.removeListener(listenerId);
       setIsListening(false);
     };
   }, [listenerConfig, memoizedCallback, config.database]);
 
   const pause = useCallback(() => {
-    SideFx.pauseListener(listenerIdRef.current);
+    Air.pauseListener(listenerIdRef.current);
     setIsListening(false);
   }, []);
 
   const resume = useCallback(() => {
-    SideFx.resumeListener(listenerIdRef.current);
+    Air.resumeListener(listenerIdRef.current);
     setIsListening(true);
   }, []);
 
   const refresh = useCallback(() => {
-    SideFx.checkSQLiteChanges(config.database ?? 'default', config.table);
+    // Air.checkColdChanges auto-uses default database if none specified
+    Air.checkColdChanges(config.database, config.table);
     forceUpdate({});
   }, [config.database, config.table]);
 
-  // Query function - queries SQLite on-demand
+  // Query function - queries Cold storage on-demand
+  // Air.queryCold auto-initializes default database if none specified
   const query = useCallback((): T | null => {
-    const dbName = config.database ?? 'default';
-
     // If a custom query is provided, use it
     if (config.query) {
-      return SideFx.querySQLite<T>(
+      return Air.queryCold<T>(
         config.query,
         config.queryParams,
-        dbName
+        config.database
       );
     }
 
@@ -361,7 +364,7 @@ export function useCold<T = unknown>(
         sql += ` WHERE ${config.where}`;
       }
 
-      return SideFx.querySQLite<T>(sql, config.queryParams, dbName);
+      return Air.queryCold<T>(sql, config.queryParams, config.database);
     }
 
     return null;
@@ -370,10 +373,8 @@ export function useCold<T = unknown>(
   // Query with override params
   const queryWith = useCallback(
     (params?: Array<string | number | boolean | null>): T | null => {
-      const dbName = config.database ?? 'default';
-
       if (config.query) {
-        return SideFx.querySQLite<T>(config.query, params, dbName);
+        return Air.queryCold<T>(config.query, params, config.database);
       }
 
       if (config.table) {
@@ -384,7 +385,7 @@ export function useCold<T = unknown>(
           sql += ` WHERE ${config.where}`;
         }
 
-        return SideFx.querySQLite<T>(sql, params, dbName);
+        return Air.queryCold<T>(sql, params, config.database);
       }
 
       return null;
@@ -409,10 +410,10 @@ export function useCold<T = unknown>(
 // ============================================================================
 
 /**
- * React hook for watching both warm (MMKV) and cold (SQLite) storage
+ * React hook for watching both warm and cold storage
  *
- * Supports correlation between warm and cold storage (e.g., use MMKV user ID
- * as a parameter in SQLite query).
+ * Supports correlation between warm and cold storage (e.g., use warm user ID
+ * as a parameter in cold storage query).
  *
  * @param config Configuration for both storage types
  * @param callback Optional callback fired on any change
@@ -458,7 +459,7 @@ export function useStorage<TWarm = unknown, TCold = unknown>(
   const listenerConfig = useMemo(
     () => ({
       combined: {
-        mmkv: config.warm
+        warm: config.warm
           ? {
               keys: config.warm.keys,
               patterns: config.warm.patterns,
@@ -466,7 +467,7 @@ export function useStorage<TWarm = unknown, TCold = unknown>(
               instanceId: config.warm.id ?? 'default',
             }
           : undefined,
-        sqlite: config.cold
+        cold: config.cold
           ? {
               table: config.cold.table,
               columns: config.cold.columns,
@@ -481,8 +482,8 @@ export function useStorage<TWarm = unknown, TCold = unknown>(
         logic: config.logic ?? 'OR',
         correlation: config.correlation
           ? {
-              mmkvKey: config.correlation.warmKey,
-              sqliteParam: config.correlation.coldParam,
+              warmKey: config.correlation.warmKey,
+              coldParam: config.correlation.coldParam,
             }
           : undefined,
       },
@@ -496,13 +497,15 @@ export function useStorage<TWarm = unknown, TCold = unknown>(
 
   useEffect(() => {
     const listenerId = listenerIdRef.current;
+    const warmInstanceId = config.warm?.id ?? 'default';
 
-    // Initialize storage adapters if needed
-    if (config.warm && !SideFx.isMMKVInitialized(config.warm.id)) {
-      SideFx.initializeMMKV(config.warm.id);
+    // Only initialize non-default Warm instances explicitly
+    // Default instance is auto-initialized lazily by Air
+    if (config.warm && warmInstanceId !== 'default' && !Air.isWarmInitialized(warmInstanceId)) {
+      Air.initializeWarm(warmInstanceId);
     }
 
-    const result = SideFx.addListener(
+    const result = Air.addListener(
       listenerId,
       listenerConfig,
       memoizedCallback
@@ -514,25 +517,26 @@ export function useStorage<TWarm = unknown, TCold = unknown>(
     }
 
     return () => {
-      SideFx.removeListener(listenerId);
+      Air.removeListener(listenerId);
       setIsListening(false);
     };
   }, [listenerConfig, memoizedCallback, config.warm]);
 
   const pause = useCallback(() => {
-    SideFx.pauseListener(listenerIdRef.current);
+    Air.pauseListener(listenerIdRef.current);
     setIsListening(false);
   }, []);
 
   const resume = useCallback(() => {
-    SideFx.resumeListener(listenerIdRef.current);
+    Air.resumeListener(listenerIdRef.current);
     setIsListening(true);
   }, []);
 
   const refresh = useCallback(() => {
-    SideFx.checkMMKVChanges();
-    if (config.cold?.database) {
-      SideFx.checkSQLiteChanges(config.cold.database, config.cold.table);
+    Air.checkWarmChanges();
+    // Air.checkColdChanges auto-uses default database if none specified
+    if (config.cold) {
+      Air.checkColdChanges(config.cold.database, config.cold.table);
     }
     forceUpdate({});
   }, [config.cold?.database, config.cold?.table]);
@@ -540,28 +544,27 @@ export function useStorage<TWarm = unknown, TCold = unknown>(
   // Query warm storage value
   const getWarm = useCallback((key: string): TWarm | undefined => {
     const instanceId = config.warm?.id ?? 'default';
-    const value = SideFx.getMMKV(key, instanceId);
+    const value = Air.getWarm(key, instanceId);
     return value as TWarm | undefined;
   }, [config.warm?.id]);
 
   // Query cold storage data
+  // Air.queryCold auto-initializes default database if none specified
   const queryCold = useCallback((): TCold | null => {
     if (!config.cold) return null;
 
-    const dbName = config.cold.database ?? 'default';
-
     if (config.cold.query) {
-      return SideFx.querySQLite<TCold>(
+      return Air.queryCold<TCold>(
         config.cold.query,
         config.cold.queryParams,
-        dbName
+        config.cold.database
       );
     }
 
     if (config.cold.table) {
       const columns = config.cold.columns?.join(', ') ?? '*';
       const sql = `SELECT ${columns} FROM ${config.cold.table}`;
-      return SideFx.querySQLite<TCold>(sql, config.cold.queryParams, dbName);
+      return Air.queryCold<TCold>(sql, config.cold.queryParams, config.cold.database);
     }
 
     return null;

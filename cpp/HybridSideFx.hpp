@@ -5,6 +5,10 @@
 #include "../nitrogen/generated/shared/c++/ListenerInfo.hpp"
 #include "../nitrogen/generated/shared/c++/ListenerResult.hpp"
 #include "../nitrogen/generated/shared/c++/SAMConfig.hpp"
+#include "../nitrogen/generated/shared/c++/NetworkState.hpp"
+#include "../nitrogen/generated/shared/c++/NetworkStatus.hpp"
+#include "../nitrogen/generated/shared/c++/ConnectionType.hpp"
+#include "../nitrogen/generated/shared/c++/CellularGeneration.hpp"
 #include <NitroModules/Null.hpp>
 #include <chrono>
 #include <iostream>
@@ -20,11 +24,19 @@
 #include <iomanip>
 
 // MMKV C++ Core library - shared with react-native-mmkv
-#include <MMKV/MMKV.h>
+#include <MMKVCore/MMKV.h>
 
-// Platform-specific includes for path detection
+// Platform-specific includes for path detection and network monitoring
 #ifdef __APPLE__
 #import <Foundation/Foundation.h>
+#import <Network/Network.h>
+#import <SystemConfiguration/SystemConfiguration.h>
+#import <CoreTelephony/CTTelephonyNetworkInfo.h>
+#import <CoreTelephony/CTCarrier.h>
+#endif
+
+#ifdef __ANDROID__
+// Android-specific includes would go here
 #endif
 
 namespace margelo::nitro::sam {
@@ -66,9 +78,9 @@ public:
     }
 
     // Validate config
-    if (!config.mmkv.has_value() && !config.sqlite.has_value() &&
+    if (!config.warm.has_value() && !config.cold.has_value() &&
         !config.combined.has_value()) {
-      return ListenerResult(false, "At least one of mmkv, sqlite, or combined must be specified");
+      return ListenerResult(false, "At least one of warm, cold, or combined must be specified");
     }
 
     // Create listener entry
@@ -192,82 +204,82 @@ public:
   // Storage Initialization
   // =========================================================================
 
-  std::string getDefaultMMKVPath() override {
-    return getDefaultMMKVPathInternal();
+  std::string getDefaultWarmPath() override {
+    return getDefaultWarmPathInternal();
   }
 
-  void setMMKVRootPath(const std::string& rootPath) override {
+  void setWarmRootPath(const std::string& rootPath) override {
     std::lock_guard<std::mutex> lock(_mutex);
-    if (_mmkvGlobalInitialized) {
-      logDebug("Warning: MMKV already initialized, setMMKVRootPath has no effect");
+    if (_warmGlobalInitialized) {
+      logDebug("Warning: Warm storage already initialized, setWarmRootPath has no effect");
       return;
     }
-    _mmkvRootPath = rootPath;
+    _warmRootPath = rootPath;
     if (_debugMode) {
-      logDebug("MMKV root path set to: " + rootPath);
+      logDebug("Warm storage root path set to: " + rootPath);
     }
   }
 
-  ListenerResult initializeMMKV(const std::optional<std::string>& instanceId) override {
+  ListenerResult initializeWarm(const std::optional<std::string>& instanceId) override {
     std::lock_guard<std::mutex> lock(_mutex);
     std::string id = instanceId.value_or("default");
 
     // Check if already initialized in our tracking
-    if (_mmkvInstances.find(id) != _mmkvInstances.end()) {
+    if (_warmInstances.find(id) != _warmInstances.end()) {
       if (_debugMode) {
-        logDebug("MMKV instance already initialized: " + id);
+        logDebug("Warm instance already initialized: " + id);
       }
       return ListenerResult(true, std::nullopt);
     }
 
-    // Initialize MMKV globally if not done yet
+    // Initialize Warm storage globally if not done yet
     // This uses the same default path that react-native-mmkv uses,
     // so storage is shared if both libraries are present
-    if (!_mmkvGlobalInitialized) {
+    if (!_warmGlobalInitialized) {
       // Auto-detect default path if not explicitly set
-      if (_mmkvRootPath.empty()) {
-        _mmkvRootPath = getDefaultMMKVPathInternal();
-        if (_mmkvRootPath.empty()) {
+      if (_warmRootPath.empty()) {
+        _warmRootPath = getDefaultWarmPathInternal();
+        if (_warmRootPath.empty()) {
           return ListenerResult(false,
-            "MMKV root path not set and could not auto-detect. "
-            "Call setMMKVRootPath() first with your app's files directory + '/mmkv'");
+            "Warm root path not set and could not auto-detect. "
+            "Call setWarmRootPath() first with your app's files directory + '/mmkv'");
         }
         if (_debugMode) {
-          logDebug("Auto-detected MMKV root path: " + _mmkvRootPath);
+          logDebug("Auto-detected Warm root path: " + _warmRootPath);
         }
       }
 
       // Initialize MMKV with the configured root path
-      MMKV::initializeMMKV(_mmkvRootPath);
-      _mmkvGlobalInitialized = true;
+      mmkv::MMKV::initializeMMKV(_warmRootPath);
+      _warmGlobalInitialized = true;
       if (_debugMode) {
-        logDebug("MMKV globally initialized at: " + _mmkvRootPath);
+        logDebug("Warm storage globally initialized at: " + _warmRootPath);
       }
     }
 
-    // Get or create the MMKV instance
-    MMKV* mmkv = getMMKVInstance(id);
-    if (mmkv == nullptr) {
-      return ListenerResult(false, "Failed to create MMKV instance: " + id);
+    // Get or create the Warm instance
+    mmkv::MMKV* warmInstance = getWarmInstance(id);
+    if (warmInstance == nullptr) {
+      return ListenerResult(false, "Failed to create Warm instance: " + id);
     }
 
-    _mmkvInstances.insert(id);
+    _warmInstances.insert(id);
 
     if (_debugMode) {
-      logDebug("Initialized MMKV instance: " + id);
+      logDebug("Initialized Warm instance: " + id);
     }
 
     return ListenerResult(true, std::nullopt);
   }
 
-  ListenerResult initializeSQLite(const std::string& databaseName,
+  ListenerResult initializeCold(const std::string& databaseName,
                                    const std::string& databasePath) override {
     std::lock_guard<std::mutex> lock(_mutex);
 
     // Check if already initialized
     if (_sqliteDatabases.find(databaseName) != _sqliteDatabases.end()) {
       if (_debugMode) {
-        logDebug("SQLite database already initialized: " + databaseName);
+        logDebug("Cold storage database already initialized: " + databaseName);
       }
       return ListenerResult(true, std::nullopt);
     }
@@ -279,7 +291,7 @@ public:
     if (rc != SQLITE_OK) {
       std::string error = sqlite3_errmsg(db);
       sqlite3_close(db);
-      return ListenerResult(false, "Failed to open SQLite database: " + error);
+      return ListenerResult(false, "Failed to open Cold storage database: " + error);
     }
 
     // Enable WAL mode for better concurrency
@@ -291,22 +303,22 @@ public:
 
     // Store the database handle
     _sqliteDatabases[databaseName] = db;
-    _sqliteDatabasePaths[databaseName] = databasePath;
+    _coldDatabasePaths[databaseName] = databasePath;
 
     if (_debugMode) {
-      logDebug("Initialized SQLite database: " + databaseName + " at " + databasePath);
+      logDebug("Initialized Cold storage database: " + databaseName + " at " + databasePath);
     }
 
     return ListenerResult(true, std::nullopt);
   }
 
-  bool isMMKVInitialized(const std::optional<std::string>& instanceId) override {
+  bool isWarmInitialized(const std::optional<std::string>& instanceId) override {
     std::lock_guard<std::mutex> lock(_mutex);
     std::string id = instanceId.value_or("default");
-    return _mmkvInstances.find(id) != _mmkvInstances.end();
+    return _warmInstances.find(id) != _warmInstances.end();
   }
 
-  bool isSQLiteInitialized(const std::optional<std::string>& databaseName) override {
+  bool isColdInitialized(const std::optional<std::string>& databaseName) override {
     std::lock_guard<std::mutex> lock(_mutex);
     if (!databaseName.has_value()) {
       return !_sqliteDatabases.empty();
@@ -319,18 +331,18 @@ public:
   // Manual Change Checks
   // =========================================================================
 
-  void checkMMKVChanges() override {
-    // TODO: Implement MMKV change detection
+  void checkWarmChanges() override {
+    // TODO: Implement Warm storage change detection
     if (_debugMode) {
-      logDebug("Checking MMKV changes");
+      logDebug("Checking Warm storage changes");
     }
   }
 
-  void checkSQLiteChanges(const std::string& databaseName,
+  void checkColdChanges(const std::string& databaseName,
                           const std::optional<std::string>& table) override {
-    // TODO: Implement SQLite change detection
+    // TODO: Implement Cold storage change detection
     if (_debugMode) {
-      std::string msg = "Checking SQLite changes for database: " + databaseName;
+      std::string msg = "Checking Cold storage changes for database: " + databaseName;
       if (table.has_value()) {
         msg += ", table: " + table.value();
       }
@@ -362,63 +374,63 @@ public:
   // Storage Write/Read Methods
   // =========================================================================
 
-  ListenerResult setMMKV(const std::string& key,
+  ListenerResult setWarm(const std::string& key,
                           const std::variant<bool, std::string, double>& value,
                           const std::optional<std::string>& instanceId) override {
     std::lock_guard<std::mutex> lock(_mutex);
     std::string id = instanceId.value_or("default");
 
-    // Validate MMKV instance is initialized
-    if (_mmkvInstances.find(id) == _mmkvInstances.end()) {
-      return ListenerResult(false, "MMKV instance '" + id + "' not initialized");
+    // Validate Warm instance is initialized
+    if (_warmInstances.find(id) == _warmInstances.end()) {
+      return ListenerResult(false, "Warm instance '" + id + "' not initialized");
     }
 
-    // Get the MMKV instance
-    MMKV* mmkv = getMMKVInstance(id);
-    if (mmkv == nullptr) {
-      return ListenerResult(false, "Failed to get MMKV instance: " + id);
+    // Get the Warm instance
+    mmkv::MMKV* warmStorage = getWarmInstance(id);
+    if (warmStorage == nullptr) {
+      return ListenerResult(false, "Failed to get Warm instance: " + id);
     }
 
     // Set value based on type
     bool success = false;
     if (std::holds_alternative<bool>(value)) {
-      success = mmkv->set(std::get<bool>(value), key);
+      success = warmStorage->set(std::get<bool>(value), key);
     } else if (std::holds_alternative<std::string>(value)) {
-      success = mmkv->set(std::get<std::string>(value), key);
+      success = warmStorage->set(std::get<std::string>(value), key);
     } else if (std::holds_alternative<double>(value)) {
-      success = mmkv->set(std::get<double>(value), key);
+      success = warmStorage->set(std::get<double>(value), key);
     }
 
     if (!success) {
-      return ListenerResult(false, "Failed to set MMKV key: " + key);
+      return ListenerResult(false, "Failed to set Warm key: " + key);
     }
 
     if (_debugMode) {
-      logDebug("Set MMKV key '" + key + "' in instance '" + id + "'");
+      logDebug("Set Warm key '" + key + "' in instance '" + id + "'");
     }
 
     return ListenerResult(true, std::nullopt);
   }
 
-  std::variant<nitro::NullType, bool, std::string, double> getMMKV(
+  std::variant<nitro::NullType, bool, std::string, double> getWarm(
       const std::string& key,
       const std::optional<std::string>& instanceId) override {
     std::lock_guard<std::mutex> lock(_mutex);
     std::string id = instanceId.value_or("default");
 
     // Check if instance is initialized
-    if (_mmkvInstances.find(id) == _mmkvInstances.end()) {
+    if (_warmInstances.find(id) == _warmInstances.end()) {
       return nitro::NullType();
     }
 
-    // Get the MMKV instance
-    MMKV* mmkv = getMMKVInstance(id);
-    if (mmkv == nullptr) {
+    // Get the Warm instance
+    mmkv::MMKV* warmStorage = getWarmInstance(id);
+    if (warmStorage == nullptr) {
       return nitro::NullType();
     }
 
     // Check if key exists
-    if (!mmkv->containsKey(key)) {
+    if (!warmStorage->containsKey(key)) {
       return nitro::NullType();
     }
 
@@ -426,7 +438,7 @@ public:
     // MMKV doesn't store type info, so we try each type in order
     // First try string (most common for JSON data)
     std::string stringValue;
-    if (mmkv->getString(key, stringValue)) {
+    if (warmStorage->getString(key, stringValue)) {
       // Check if it's a JSON boolean or number encoded as string
       if (stringValue == "true") {
         return true;
@@ -448,13 +460,13 @@ public:
 
     // Try bool
     bool hasValue = false;
-    bool boolValue = mmkv->getBool(key, false, &hasValue);
+    bool boolValue = warmStorage->getBool(key, false, &hasValue);
     if (hasValue) {
       return boolValue;
     }
 
     // Try double
-    double doubleValue = mmkv->getDouble(key, 0.0, &hasValue);
+    double doubleValue = warmStorage->getDouble(key, 0.0, &hasValue);
     if (hasValue) {
       return doubleValue;
     }
@@ -462,38 +474,38 @@ public:
     return nitro::NullType();
   }
 
-  ListenerResult deleteMMKV(const std::string& key,
+  ListenerResult deleteWarm(const std::string& key,
                             const std::optional<std::string>& instanceId) override {
     std::lock_guard<std::mutex> lock(_mutex);
     std::string id = instanceId.value_or("default");
 
     // Check if instance is initialized
-    if (_mmkvInstances.find(id) == _mmkvInstances.end()) {
-      return ListenerResult(false, "MMKV instance '" + id + "' not initialized");
+    if (_warmInstances.find(id) == _warmInstances.end()) {
+      return ListenerResult(false, "Warm instance '" + id + "' not initialized");
     }
 
-    // Get the MMKV instance
-    MMKV* mmkv = getMMKVInstance(id);
-    if (mmkv == nullptr) {
-      return ListenerResult(false, "Failed to get MMKV instance: " + id);
+    // Get the Warm instance
+    mmkv::MMKV* warmStorage = getWarmInstance(id);
+    if (warmStorage == nullptr) {
+      return ListenerResult(false, "Failed to get Warm instance: " + id);
     }
 
     // Check if key exists
-    if (!mmkv->containsKey(key)) {
+    if (!warmStorage->containsKey(key)) {
       return ListenerResult(false, "Key '" + key + "' not found");
     }
 
     // Remove the key
-    mmkv->removeValueForKey(key);
+    warmStorage->removeValueForKey(key);
 
     if (_debugMode) {
-      logDebug("Deleted MMKV key '" + key + "' from instance '" + id + "'");
+      logDebug("Deleted Warm key '" + key + "' from instance '" + id + "'");
     }
 
     return ListenerResult(true, std::nullopt);
   }
 
-  ListenerResult executeSQLite(
+  ListenerResult executeCold(
       const std::string& sql,
       const std::optional<std::vector<std::variant<nitro::NullType, bool, std::string, double>>>& params,
       const std::optional<std::string>& databaseName) override {
@@ -503,13 +515,13 @@ public:
     // Check if database exists
     auto dbIt = _sqliteDatabases.find(dbName);
     if (dbIt == _sqliteDatabases.end() || dbIt->second == nullptr) {
-      return ListenerResult(false, "SQLite database '" + dbName + "' not initialized");
+      return ListenerResult(false, "Cold storage database '" + dbName + "' not initialized");
     }
 
     sqlite3* db = dbIt->second;
 
     if (_debugMode) {
-      logDebug("Execute SQL on database '" + dbName + "': " + sql);
+      logDebug("Execute SQL on Cold storage '" + dbName + "': " + sql);
     }
 
     // Prepare statement
@@ -553,7 +565,7 @@ public:
     return ListenerResult(true, std::nullopt);
   }
 
-  std::variant<nitro::NullType, std::string> querySQLite(
+  std::variant<nitro::NullType, std::string> queryCold(
       const std::string& sql,
       const std::optional<std::vector<std::variant<nitro::NullType, bool, std::string, double>>>& params,
       const std::optional<std::string>& databaseName) override {
@@ -569,7 +581,7 @@ public:
     sqlite3* db = dbIt->second;
 
     if (_debugMode) {
-      logDebug("Query SQL on database '" + dbName + "': " + sql);
+      logDebug("Query Cold storage '" + dbName + "': " + sql);
     }
 
     // Prepare statement
@@ -666,6 +678,190 @@ public:
     return jsonStream.str();
   }
 
+  // =========================================================================
+  // Network Monitoring
+  // =========================================================================
+
+  ListenerResult startNetworkMonitoring() override {
+    std::lock_guard<std::mutex> lock(_mutex);
+
+    if (_networkMonitoringActive) {
+      return ListenerResult(true, std::nullopt);
+    }
+
+#ifdef __APPLE__
+    @autoreleasepool {
+      // Create the path monitor
+      _networkPathMonitor = nw_path_monitor_create();
+
+      // Set the queue
+      _networkQueue = dispatch_queue_create("com.sam.network", DISPATCH_QUEUE_SERIAL);
+      nw_path_monitor_set_queue(_networkPathMonitor, _networkQueue);
+
+      // Capture this pointer for the callback
+      HybridSideFx* self = this;
+
+      // Set the update handler
+      nw_path_monitor_set_update_handler(_networkPathMonitor, ^(nw_path_t path) {
+        self->updateNetworkStateFromPath(path);
+        // Also check internet quality when network changes
+        self->checkInternetQualityAsync();
+      });
+
+      // Start monitoring
+      nw_path_monitor_start(_networkPathMonitor);
+
+      // Start periodic internet quality checks
+      // - In active mode: every 10 seconds for quality monitoring
+      // - In passive mode (offline recovery): every 30 seconds to detect when back online
+      // The timer always runs at 30s, but checkInternetQualityAsync() decides whether to actually ping
+      _pingTimer = dispatch_source_create(DISPATCH_SOURCE_TYPE_TIMER, 0, 0, _networkQueue);
+      uint64_t intervalNs = _useActivePing ? (10 * NSEC_PER_SEC) : (30 * NSEC_PER_SEC);
+      dispatch_source_set_timer(_pingTimer, dispatch_time(DISPATCH_TIME_NOW, 0), intervalNs, 1 * NSEC_PER_SEC);
+      dispatch_source_set_event_handler(_pingTimer, ^{
+        self->checkInternetQualityAsync();
+      });
+      dispatch_resume(_pingTimer);
+
+      _networkMonitoringActive = true;
+
+      if (_debugMode) {
+        logDebug("Network monitoring started with internet quality checks");
+      }
+    }
+#else
+    // Android implementation would go here
+    _networkMonitoringActive = true;
+#endif
+
+    return ListenerResult(true, std::nullopt);
+  }
+
+  ListenerResult stopNetworkMonitoring() override {
+    std::lock_guard<std::mutex> lock(_mutex);
+
+    if (!_networkMonitoringActive) {
+      return ListenerResult(true, std::nullopt);
+    }
+
+#ifdef __APPLE__
+    if (_pingTimer != nullptr) {
+      dispatch_source_cancel(_pingTimer);
+      _pingTimer = nullptr;
+    }
+    if (_networkPathMonitor != nullptr) {
+      nw_path_monitor_cancel(_networkPathMonitor);
+      _networkPathMonitor = nullptr;
+    }
+#endif
+
+    _networkMonitoringActive = false;
+
+    if (_debugMode) {
+      logDebug("Network monitoring stopped");
+    }
+
+    return ListenerResult(true, std::nullopt);
+  }
+
+  bool isNetworkMonitoringActive() override {
+    return _networkMonitoringActive;
+  }
+
+  NetworkState getNetworkState() override {
+    std::lock_guard<std::mutex> lock(_mutex);
+    return _currentNetworkState;
+  }
+
+  void refreshNetworkState() override {
+#ifdef __APPLE__
+    // On iOS, the path monitor will automatically update
+    // We can force a state update by querying current reachability
+    @autoreleasepool {
+      SCNetworkReachabilityRef reachability = SCNetworkReachabilityCreateWithName(NULL, "www.apple.com");
+      if (reachability != NULL) {
+        SCNetworkReachabilityFlags flags;
+        if (SCNetworkReachabilityGetFlags(reachability, &flags)) {
+          updateNetworkStateFromReachabilityFlags(flags);
+        }
+        CFRelease(reachability);
+      }
+    }
+#else
+    // Android implementation would go here
+#endif
+
+    if (_debugMode) {
+      logDebug("Network state refreshed");
+    }
+  }
+
+  void setActivePingMode(bool enabled) override {
+    std::lock_guard<std::mutex> lock(_mutex);
+    _useActivePing = enabled;
+
+    if (_debugMode) {
+      logDebug("Active ping mode " + std::string(enabled ? "enabled" : "disabled"));
+    }
+
+#ifdef __APPLE__
+    // Update timer interval based on mode
+    // Active: 10 seconds for quality monitoring
+    // Passive: 30 seconds for offline recovery only
+    if (_pingTimer != nullptr) {
+      uint64_t intervalNs = enabled ? (10 * NSEC_PER_SEC) : (30 * NSEC_PER_SEC);
+      dispatch_source_set_timer(_pingTimer, dispatch_time(DISPATCH_TIME_NOW, 0), intervalNs, 1 * NSEC_PER_SEC);
+    }
+#endif
+
+    // If enabling active ping and network monitoring is already active, trigger a check now
+    if (enabled && _networkMonitoringActive) {
+      checkInternetQualityAsync();
+    }
+  }
+
+  void reportNetworkLatency(double latencyMs) override {
+    std::lock_guard<std::mutex> lock(_mutex);
+
+    // Ignore invalid values
+    if (latencyMs < 0) {
+      return;
+    }
+
+    // Update latency and quality
+    _lastPingLatencyMs = latencyMs;
+    _internetQuality = latencyToQuality(latencyMs);
+
+    // A successful network call means internet is reachable!
+    // This is crucial for passive mode to work correctly.
+    _internetReachable = true;
+    _isCheckingOfflineRecovery = false;  // No longer need to check for recovery
+
+    if (_debugMode) {
+      logDebug("Reported network latency: " + std::to_string((int)latencyMs) + "ms, quality: " + _internetQuality + ", reachable: true");
+    }
+
+    // Update Warm storage with the new quality
+    updateInternetQualityWarmKeys();
+  }
+
+  void reportNetworkFailure() override {
+    std::lock_guard<std::mutex> lock(_mutex);
+
+    // A network failure means internet may be unreachable
+    _internetReachable = false;
+    _internetQuality = "offline";
+    _lastPingLatencyMs = -1;
+    _isCheckingOfflineRecovery = true;  // Start checking for recovery
+
+    if (_debugMode) {
+      logDebug("Reported network failure - starting offline recovery checks");
+    }
+
+    // Update Warm storage
+    updateInternetQualityWarmKeys();
+  }
+
 private:
   // Internal listener entry structure
   struct ListenerEntry {
@@ -693,39 +889,66 @@ private:
   size_t _maxListeners;
 
   // Initialized storage instances
-  std::set<std::string> _mmkvInstances;
-  std::map<std::string, std::string> _sqliteDatabasePaths;
+  std::set<std::string> _warmInstances;
+  std::map<std::string, std::string> _coldDatabasePaths;
 
-  // SQLite database handles
+  // Cold storage database handles
   std::map<std::string, sqlite3*> _sqliteDatabases;
 
-  // MMKV global initialization state
-  bool _mmkvGlobalInitialized = false;
-  std::string _mmkvRootPath;  // Empty string means use MMKV's default path
+  // Warm storage global initialization state
+  bool _warmGlobalInitialized = false;
+  std::string _warmRootPath;  // Empty string means use MMKV's default path
+
+  // Network monitoring state
+  bool _networkMonitoringActive = false;
+  NetworkState _currentNetworkState = NetworkState(
+      NetworkStatus::UNKNOWN,
+      ConnectionType::UNKNOWN,
+      false,   // isConnected
+      -1,      // isInternetReachable (-1 = unknown)
+      CellularGeneration::UNKNOWN,
+      -1,      // wifiStrength (-1 = unavailable)
+      false,   // isConnectionExpensive
+      0        // timestamp
+  );
+
+  // Internet quality tracking
+  double _lastPingLatencyMs = -1;  // -1 = unknown, >= 0 = latency in ms
+  std::string _internetQuality = "unknown";  // "excellent", "good", "fair", "poor", "offline", "unknown"
+  bool _internetReachable = false;  // True if internet is actually reachable (single source of truth)
+  bool _useActivePing = false;  // If true, use active HTTP pings. If false, rely on passive observation.
+  int _pingEndpointIndex = 0;  // Current endpoint index for round-robin
+  bool _isCheckingOfflineRecovery = false;  // If true, we're in offline state doing recovery checks
+
+#ifdef __APPLE__
+  nw_path_monitor_t _networkPathMonitor = nullptr;
+  dispatch_queue_t _networkQueue = nullptr;
+  dispatch_source_t _pingTimer = nullptr;
+#endif
 
   // =========================================================================
   // Helper Methods
   // =========================================================================
 
   /**
-   * Get an MMKV instance by ID
+   * Get a Warm storage (MMKV) instance by ID
    * Handles cross-platform differences in the MMKV API
    */
-  MMKV* getMMKVInstance(const std::string& id) {
+  mmkv::MMKV* getWarmInstance(const std::string& id) {
 #ifdef __ANDROID__
     // Android version has an additional size parameter
-    return MMKV::mmkvWithID(id, mmkv::DEFAULT_MMAP_SIZE, MMKV_SINGLE_PROCESS);
+    return mmkv::MMKV::mmkvWithID(id, mmkv::DEFAULT_MMAP_SIZE, mmkv::MMKV_SINGLE_PROCESS);
 #else
     // iOS/macOS version
-    return MMKV::mmkvWithID(id, MMKV_SINGLE_PROCESS);
+    return mmkv::MMKV::mmkvWithID(id, mmkv::MMKV_SINGLE_PROCESS);
 #endif
   }
 
   /**
-   * Get the platform-specific default MMKV path
+   * Get the platform-specific default Warm storage path
    * Internal version that can be called without override
    */
-  std::string getDefaultMMKVPathInternal() {
+  std::string getDefaultWarmPathInternal() {
 #ifdef __APPLE__
     // iOS/macOS: Use Library directory (same as react-native-mmkv)
     @autoreleasepool {
@@ -737,7 +960,7 @@ private:
 #else
     // Android: Return the path if already set, otherwise empty
     // Android path must be set from Java side (Context.getFilesDir() + "/mmkv")
-    return _mmkvRootPath;
+    return _warmRootPath;
 #endif
   }
 
@@ -858,6 +1081,474 @@ private:
       }
     }
   }
+
+#ifdef __APPLE__
+  /**
+   * Update network state from NWPath (iOS Network framework)
+   */
+  void updateNetworkStateFromPath(nw_path_t path) {
+    std::lock_guard<std::mutex> lock(_mutex);
+
+    nw_path_status_t status = nw_path_get_status(path);
+    bool isConnected = (status == nw_path_status_satisfied || status == nw_path_status_satisfiable);
+
+    // Determine connection type
+    ConnectionType connType = ConnectionType::UNKNOWN;
+    bool isExpensive = nw_path_is_expensive(path);
+
+    if (nw_path_uses_interface_type(path, nw_interface_type_wifi)) {
+      connType = ConnectionType::WIFI;
+    } else if (nw_path_uses_interface_type(path, nw_interface_type_cellular)) {
+      connType = ConnectionType::CELLULAR;
+    } else if (nw_path_uses_interface_type(path, nw_interface_type_wired)) {
+      connType = ConnectionType::ETHERNET;
+    } else if (!isConnected) {
+      connType = ConnectionType::NONE;
+    }
+
+    // Determine network status (online/offline/unknown)
+    NetworkStatus netStatus = NetworkStatus::UNKNOWN;
+    if (status == nw_path_status_satisfied) {
+      netStatus = NetworkStatus::ONLINE;
+    } else if (status == nw_path_status_unsatisfied) {
+      netStatus = NetworkStatus::OFFLINE;
+    }
+
+    // Get cellular generation if on cellular
+    CellularGeneration cellGen = CellularGeneration::UNKNOWN;
+    if (connType == ConnectionType::CELLULAR) {
+      cellGen = getCellularGeneration();
+    }
+
+    // Update state
+    _currentNetworkState = NetworkState(
+        netStatus,
+        connType,
+        isConnected,
+        isConnected ? 1 : 0,  // isInternetReachable (simplified)
+        cellGen,
+        -1,  // wifiStrength not available via Network framework
+        isExpensive,
+        getCurrentTimestamp()
+    );
+
+    // Store in Warm storage for reactive listeners
+    updateNetworkWarmKeys();
+
+    if (_debugMode) {
+      logDebug("Network state updated: " + networkStatusToString(netStatus) +
+               ", type: " + connectionTypeToString(connType));
+    }
+  }
+
+  /**
+   * Update network state from SCNetworkReachability flags
+   */
+  void updateNetworkStateFromReachabilityFlags(SCNetworkReachabilityFlags flags) {
+    bool isReachable = (flags & kSCNetworkReachabilityFlagsReachable) != 0;
+    bool needsConnection = (flags & kSCNetworkReachabilityFlagsConnectionRequired) != 0;
+    bool isConnected = isReachable && !needsConnection;
+
+    ConnectionType connType = ConnectionType::UNKNOWN;
+    if (!isConnected) {
+      connType = ConnectionType::NONE;
+    } else if (flags & kSCNetworkReachabilityFlagsIsWWAN) {
+      connType = ConnectionType::CELLULAR;
+    } else {
+      connType = ConnectionType::WIFI;
+    }
+
+    NetworkStatus netStatus = isConnected ? NetworkStatus::ONLINE : NetworkStatus::OFFLINE;
+
+    CellularGeneration cellGen = CellularGeneration::UNKNOWN;
+    if (connType == ConnectionType::CELLULAR) {
+      cellGen = getCellularGeneration();
+    }
+
+    _currentNetworkState = NetworkState(
+        netStatus,
+        connType,
+        isConnected,
+        isConnected ? 1 : 0,
+        cellGen,
+        -1,
+        (flags & kSCNetworkReachabilityFlagsIsWWAN) != 0,
+        getCurrentTimestamp()
+    );
+
+    updateNetworkWarmKeys();
+  }
+
+  /**
+   * Get cellular generation from CoreTelephony
+   */
+  CellularGeneration getCellularGeneration() {
+    @autoreleasepool {
+      CTTelephonyNetworkInfo *networkInfo = [[CTTelephonyNetworkInfo alloc] init];
+      NSString *radioAccess = nil;
+
+      if (@available(iOS 12.0, *)) {
+        NSDictionary *radioDict = networkInfo.serviceCurrentRadioAccessTechnology;
+        radioAccess = radioDict.allValues.firstObject;
+      } else {
+        radioAccess = networkInfo.currentRadioAccessTechnology;
+      }
+
+      if (radioAccess == nil) {
+        return CellularGeneration::UNKNOWN;
+      }
+
+      // 5G
+      if (@available(iOS 14.1, *)) {
+        if ([radioAccess isEqualToString:CTRadioAccessTechnologyNRNSA] ||
+            [radioAccess isEqualToString:CTRadioAccessTechnologyNR]) {
+          return CellularGeneration::_5G;
+        }
+      }
+
+      // 4G/LTE
+      if ([radioAccess isEqualToString:CTRadioAccessTechnologyLTE]) {
+        return CellularGeneration::_4G;
+      }
+
+      // 3G
+      if ([radioAccess isEqualToString:CTRadioAccessTechnologyWCDMA] ||
+          [radioAccess isEqualToString:CTRadioAccessTechnologyHSDPA] ||
+          [radioAccess isEqualToString:CTRadioAccessTechnologyHSUPA] ||
+          [radioAccess isEqualToString:CTRadioAccessTechnologyCDMA1x] ||
+          [radioAccess isEqualToString:CTRadioAccessTechnologyCDMAEVDORev0] ||
+          [radioAccess isEqualToString:CTRadioAccessTechnologyCDMAEVDORevA] ||
+          [radioAccess isEqualToString:CTRadioAccessTechnologyCDMAEVDORevB] ||
+          [radioAccess isEqualToString:CTRadioAccessTechnologyeHRPD]) {
+        return CellularGeneration::_3G;
+      }
+
+      // 2G
+      if ([radioAccess isEqualToString:CTRadioAccessTechnologyGPRS] ||
+          [radioAccess isEqualToString:CTRadioAccessTechnologyEdge]) {
+        return CellularGeneration::_2G;
+      }
+
+      return CellularGeneration::UNKNOWN;
+    }
+  }
+
+  /**
+   * Update Warm storage keys with current network state
+   * This allows JS components to subscribe via useWarm
+   */
+  void updateNetworkWarmKeys() {
+    // Ensure Warm is initialized for network state
+    if (_warmInstances.find("sam-network") == _warmInstances.end()) {
+      // Auto-initialize network Warm instance
+      if (_warmGlobalInitialized || !_warmRootPath.empty() || !getDefaultWarmPathInternal().empty()) {
+        if (!_warmGlobalInitialized) {
+          std::string path = _warmRootPath.empty() ? getDefaultWarmPathInternal() : _warmRootPath;
+          if (!path.empty()) {
+            mmkv::MMKV::initializeMMKV(path);
+            _warmGlobalInitialized = true;
+          }
+        }
+        if (_warmGlobalInitialized) {
+          _warmInstances.insert("sam-network");
+        }
+      }
+    }
+
+    if (_warmInstances.find("sam-network") == _warmInstances.end()) {
+      return;  // Can't store without Warm
+    }
+
+    mmkv::MMKV* storage = getWarmInstance("sam-network");
+    if (storage == nullptr) return;
+
+    // Store simplified network status for easy subscription
+    // Values: "online", "offline", "unknown"
+    storage->set(networkStatusToString(_currentNetworkState.status), "NETWORK_STATUS");
+
+    // Store connection type: "wifi", "cellular", "ethernet", "none", "unknown"
+    storage->set(connectionTypeToString(_currentNetworkState.type), "NETWORK_TYPE");
+
+    // Store signal quality indicator: "strong", "weak", "offline"
+    std::string quality = "unknown";
+    if (_currentNetworkState.status == NetworkStatus::OFFLINE ||
+        _currentNetworkState.type == ConnectionType::NONE) {
+      quality = "offline";
+    } else if (_currentNetworkState.status == NetworkStatus::ONLINE) {
+      if (_currentNetworkState.type == ConnectionType::WIFI ||
+          _currentNetworkState.type == ConnectionType::ETHERNET) {
+        quality = "strong";
+      } else if (_currentNetworkState.type == ConnectionType::CELLULAR) {
+        if (_currentNetworkState.cellularGeneration == CellularGeneration::_5G ||
+            _currentNetworkState.cellularGeneration == CellularGeneration::_4G) {
+          quality = "strong";
+        } else if (_currentNetworkState.cellularGeneration == CellularGeneration::_3G) {
+          quality = "medium";
+        } else {
+          quality = "weak";
+        }
+      }
+    }
+    storage->set(quality, "NETWORK_QUALITY");
+
+    // Store cellular generation if applicable
+    if (_currentNetworkState.type == ConnectionType::CELLULAR) {
+      storage->set(cellularGenerationToString(_currentNetworkState.cellularGeneration), "CELLULAR_GENERATION");
+    }
+
+    // Store boolean for quick checks
+    storage->set(_currentNetworkState.isConnected, "IS_CONNECTED");
+  }
+
+  std::string networkStatusToString(NetworkStatus status) const {
+    switch (status) {
+      case NetworkStatus::ONLINE: return "online";
+      case NetworkStatus::OFFLINE: return "offline";
+      default: return "unknown";
+    }
+  }
+
+  std::string connectionTypeToString(ConnectionType type) const {
+    switch (type) {
+      case ConnectionType::WIFI: return "wifi";
+      case ConnectionType::CELLULAR: return "cellular";
+      case ConnectionType::ETHERNET: return "ethernet";
+      case ConnectionType::BLUETOOTH: return "bluetooth";
+      case ConnectionType::VPN: return "vpn";
+      case ConnectionType::NONE: return "none";
+      default: return "unknown";
+    }
+  }
+
+  std::string cellularGenerationToString(CellularGeneration gen) const {
+    switch (gen) {
+      case CellularGeneration::_2G: return "2g";
+      case CellularGeneration::_3G: return "3g";
+      case CellularGeneration::_4G: return "4g";
+      case CellularGeneration::_5G: return "5g";
+      default: return "unknown";
+    }
+  }
+
+  /**
+   * Get list of ping endpoints for active internet quality checks
+   * Uses multiple endpoints to avoid dependency on any single service
+   */
+  std::vector<std::string> getPingEndpoints() const {
+    return {
+      "https://www.google.com/generate_204",      // Google's connectivity check
+      "https://www.apple.com/library/test/success.html",  // Apple's connectivity check
+      "https://clients3.google.com/generate_204", // Google alternate
+      "https://captive.apple.com/hotspot-detect.html",    // Apple captive portal check
+    };
+  }
+
+  /**
+   * Check internet quality by measuring latency to a reliable endpoint
+   * This runs asynchronously and updates Warm storage when complete
+   *
+   * In active mode (debug/simulator): Uses HTTP pings to measure latency
+   * In passive mode (production): Relies on reportNetworkLatency() from app network calls
+   *
+   * OFFLINE RECOVERY: When offline, always performs a check every 30 seconds
+   * to detect when internet becomes available again. This runs regardless of
+   * active ping mode setting.
+   */
+  void checkInternetQualityAsync() {
+    // If network layer says not connected, update state accordingly
+    // But still check for offline recovery
+    if (!_currentNetworkState.isConnected) {
+      _lastPingLatencyMs = -1;
+      _internetQuality = "offline";
+      _internetReachable = false;
+      updateInternetQualityWarmKeys();
+      return;
+    }
+
+    // IMPORTANT: Offline recovery check - when we're in offline state,
+    // always perform a check regardless of active ping mode.
+    // This is crucial for apps to know when they can resume network operations.
+    bool shouldCheckForRecovery = !_internetReachable || _isCheckingOfflineRecovery;
+
+    // In passive mode, skip active pings UNLESS we need to check for offline recovery
+    if (!_useActivePing && !shouldCheckForRecovery) {
+      // Just ensure we have some quality assessment based on network type
+      // Actual latency will come from app's network calls via reportNetworkLatency()
+      if (_lastPingLatencyMs < 0) {
+        // No latency data yet, use network-type-based assessment
+        _internetQuality = "unknown";
+        updateInternetQualityWarmKeys();
+      }
+      return;
+    }
+
+    @autoreleasepool {
+      // Use NSURLSession to measure actual HTTP latency
+      // This is more accurate than ping because it goes through the full network stack
+
+      // Round-robin through endpoints to avoid hammering any single service
+      auto endpoints = getPingEndpoints();
+      std::string endpoint = endpoints[_pingEndpointIndex % endpoints.size()];
+      _pingEndpointIndex++;
+
+      NSURL *url = [NSURL URLWithString:[NSString stringWithUTF8String:endpoint.c_str()]];
+      NSMutableURLRequest *request = [NSMutableURLRequest requestWithURL:url];
+      request.HTTPMethod = @"HEAD";
+      request.timeoutInterval = 10.0;
+      request.cachePolicy = NSURLRequestReloadIgnoringLocalCacheData;
+
+      // Capture self for the completion handler
+      HybridSideFx* self = this;
+      NSDate *startTime = [NSDate date];
+
+      NSURLSessionDataTask *task = [[NSURLSession sharedSession] dataTaskWithRequest:request
+        completionHandler:^(NSData *data, NSURLResponse *response, NSError *error) {
+          double latencyMs = -1;
+          std::string quality = "unknown";
+          bool reachable = false;
+
+          if (error != nil) {
+            // Request failed - internet may be unreachable
+            if (self->_debugMode) {
+              self->logDebug("Internet quality check failed: " + std::string([[error localizedDescription] UTF8String]));
+            }
+            quality = "offline";
+            latencyMs = -1;
+            reachable = false;
+          } else {
+            // Calculate latency
+            NSTimeInterval elapsed = [[NSDate date] timeIntervalSinceDate:startTime];
+            latencyMs = elapsed * 1000.0;
+
+            // Determine quality based on latency
+            quality = self->latencyToQuality(latencyMs);
+            reachable = true;  // We got a successful response!
+
+            if (self->_debugMode) {
+              self->logDebug("Internet latency: " + std::to_string((int)latencyMs) + "ms, quality: " + quality + ", reachable: true");
+            }
+          }
+
+          // Update state (need to lock)
+          {
+            std::lock_guard<std::mutex> lock(self->_mutex);
+            self->_lastPingLatencyMs = latencyMs;
+            self->_internetQuality = quality;
+            self->_internetReachable = reachable;
+            self->_isCheckingOfflineRecovery = !reachable;  // Keep checking if still offline
+          }
+
+          // Update Warm storage
+          self->updateInternetQualityWarmKeys();
+        }];
+
+      [task resume];
+    }
+  }
+
+  /**
+   * Convert latency in ms to quality string
+   * These thresholds are based on typical user experience expectations
+   */
+  std::string latencyToQuality(double latencyMs) const {
+    if (latencyMs < 0) return "unknown";
+    if (latencyMs < 100) return "excellent";  // < 100ms - very responsive
+    if (latencyMs < 300) return "good";       // 100-300ms - good for most use cases
+    if (latencyMs < 1000) return "fair";      // 300-1000ms - noticeable but usable
+    return "poor";                             // > 1000ms - significant delays
+  }
+
+  /**
+   * Update Warm storage with internet quality values
+   */
+  void updateInternetQualityWarmKeys() {
+    if (_warmInstances.find("sam-network") == _warmInstances.end()) {
+      return;
+    }
+
+    mmkv::MMKV* storage = getWarmInstance("sam-network");
+    if (storage == nullptr) return;
+
+    // Store internet quality: "excellent", "good", "fair", "poor", "offline", "unknown"
+    storage->set(_internetQuality, "INTERNET_QUALITY");
+
+    // Store latency in ms (-1 if unknown/offline)
+    storage->set(_lastPingLatencyMs, "INTERNET_LATENCY_MS");
+
+    // Store combined quality that considers both network type and internet quality
+    std::string combinedQuality = calculateCombinedQuality();
+    storage->set(combinedQuality, "NETWORK_QUALITY");
+
+    // INTERNET_REACHABLE: The single source of truth for app network operations
+    // true = internet is verified reachable, safe to make API calls
+    // false = internet is offline or unreachable, queue/skip network operations
+    storage->set(_internetReachable, "INTERNET_REACHABLE");
+
+    // INTERNET_STATE: Simple state similar to APP_STATE
+    // Values: "offline", "online", "online-weak"
+    std::string internetState = "offline";
+    if (_internetReachable) {
+      // Determine if connection is weak based on quality
+      if (_internetQuality == "poor" || _internetQuality == "fair" || combinedQuality == "weak") {
+        internetState = "online-weak";
+      } else {
+        internetState = "online";
+      }
+    }
+    storage->set(internetState, "INTERNET_STATE");
+
+    if (_debugMode) {
+      logDebug("Updated internet: state=" + internetState +
+               ", reachable=" + std::string(_internetReachable ? "true" : "false") +
+               ", quality=" + _internetQuality +
+               ", latency=" + std::to_string((int)_lastPingLatencyMs) + "ms");
+    }
+  }
+
+  /**
+   * Calculate combined quality based on network type AND internet quality
+   */
+  std::string calculateCombinedQuality() {
+    // If offline, return offline
+    if (_currentNetworkState.status == NetworkStatus::OFFLINE ||
+        _currentNetworkState.type == ConnectionType::NONE ||
+        _internetQuality == "offline") {
+      return "offline";
+    }
+
+    // If we don't have internet quality data yet, fall back to network-only assessment
+    if (_internetQuality == "unknown" || _lastPingLatencyMs < 0) {
+      // Fall back to network-type-based quality
+      if (_currentNetworkState.type == ConnectionType::WIFI ||
+          _currentNetworkState.type == ConnectionType::ETHERNET) {
+        return "strong";
+      } else if (_currentNetworkState.type == ConnectionType::CELLULAR) {
+        if (_currentNetworkState.cellularGeneration == CellularGeneration::_5G ||
+            _currentNetworkState.cellularGeneration == CellularGeneration::_4G) {
+          return "strong";
+        } else if (_currentNetworkState.cellularGeneration == CellularGeneration::_3G) {
+          return "medium";
+        } else {
+          return "weak";
+        }
+      }
+      return "unknown";
+    }
+
+    // Map internet quality to our quality scale
+    if (_internetQuality == "excellent") {
+      return "strong";
+    } else if (_internetQuality == "good") {
+      return "strong";
+    } else if (_internetQuality == "fair") {
+      return "medium";
+    } else if (_internetQuality == "poor") {
+      return "weak";
+    }
+
+    return "unknown";
+  }
+#endif
 };
 
 } // namespace margelo::nitro::sam

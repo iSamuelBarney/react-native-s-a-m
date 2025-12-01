@@ -20,7 +20,7 @@
 
 ---
 
-A high-performance Nitro Module for React Native that provides reactive listeners for MMKV (warm) and SQLite (cold) storage changes. Enables automatic component updates when storage changes — no polling, no boilerplate, just reactive persistence.
+A high-performance Nitro Module for React Native that provides reactive listeners for Warm and Cold storage changes. Enables automatic component updates when storage changes — no polling, no boilerplate, just reactive persistence.
 
 ## Capabilities Checklist
 
@@ -33,7 +33,7 @@ A high-performance Nitro Module for React Native that provides reactive listener
 | Atomic updates | | | ✅ | | ✅ | ✅ |
 | Biometric authentication | | | | | | ✅ |
 | No provider/wrapper required | | ✅ | ✅ | | | ✅ |
-| SQLite reactive queries | | | | | | ✅ |
+| Cold storage reactive queries | | | | | | ✅ |
 | Fine-grained reactivity | | | ✅ | ✅ | ✅ | ✅ |
 | Key pattern matching (`user.*`) | | | | | | ✅ |
 | Minimal boilerplate | | ✅ | ✅ | | | ✅ |
@@ -45,7 +45,6 @@ A high-performance Nitro Module for React Native that provides reactive listener
 | Immer integration | ✅ | ✅ | ✅ | | | ✅ |
 | Cross-instance sync | | | | | | ✅ |
 | Built-in debounce/throttle | | | | | | ✅ |
-| MFE state tracking | | | | | | ✅ |
 | Observable patterns | | | | ✅ | | ✅ |
 | Warm + Cold storage unified | | | | | | ✅ |
 | Selector support | ✅ | ✅ | ✅ | ✅ | ✅ | ✅ |
@@ -76,13 +75,12 @@ S.A.M was built from the ground up for **mobile-first, storage-native** state ma
 | **Setup Complexity** | High (actions, reducers, store) | Low | Low | Medium | **Zero config** |
 | **Secure Storage** | Separate library | Separate library | Separate library | Separate library | **Built-in Keychain/Keystore** |
 | **Biometric Auth** | DIY | DIY | DIY | DIY | **Built-in Face ID/Touch ID** |
-| **SQLite Support** | No | No | No | No | **Yes, reactive queries** |
+| **Cold Storage Support** | No | No | No | No | **Yes, reactive queries** |
 | **Pattern Matching** | No | No | No | No | **Yes (`user.*`, `settings.*.enabled`)** |
 | **Conditional Triggers** | No | No | No | No | **Yes (greaterThan, contains, etc.)** |
 | **Native Performance** | JS bridge | JS bridge | JS bridge | JS bridge | **C++ via Nitro** |
 | **Cross-Instance Sync** | Manual | Manual | Manual | Manual | **Automatic** |
 | **Debounce/Throttle** | Middleware | DIY | DIY | DIY | **Built-in** |
-| **MFE State Tracking** | No | No | No | No | **Yes** |
 | **React Native Focus** | Afterthought | Afterthought | Limited DevTools | Good | **Native-first** |
 
 ### Why Storage-Native Wins
@@ -94,7 +92,7 @@ S.A.M was built from the ground up for **mobile-first, storage-native** state ma
 // Result: State and storage are separate concerns you must sync
 
 // ✅ S.A.M: Storage IS State
-SideFx.setMMKV('user.name', 'John');  // Stored AND reactive
+Air.setWarm('user.name', 'John');  // Stored AND reactive
 // That's it. Components automatically update. Persists across restarts.
 ```
 
@@ -103,7 +101,7 @@ SideFx.setMMKV('user.name', 'John');  // Stored AND reactive
 | Scenario | Traditional Approach | S.A.M Approach |
 |----------|---------------------|----------------|
 | **Auth Token Storage** | AsyncStorage + state sync + separate secure storage lib | `SecureStorage.set()` with biometrics |
-| **Shopping Cart** | Redux slice + persist middleware + rehydration logic | `SideFx.setMMKV('cart', data)` — done |
+| **Shopping Cart** | Redux slice + persist middleware + rehydration logic | `Air.setWarm('cart', data)` — done |
 | **Offline-First Data** | Complex saga/thunk + SQLite lib + manual sync | `useCold({ table: 'orders' })` — reactive |
 | **User Preferences** | Context + AsyncStorage + manual persistence | `useWarm({ keys: ['settings.*'] })` |
 | **Search with Debounce** | useState + useEffect + setTimeout cleanup | `options: { debounceMs: 300 }` |
@@ -121,24 +119,22 @@ SideFx.setMMKV('user.name', 'John');  // Stored AND reactive
 
 ## Features
 
-- **Reactive Storage** — Automatic notifications on MMKV and SQLite changes
+- **Reactive Storage** — Automatic notifications on Warm and SQLite changes
 - **Pattern Matching** — Watch keys with glob patterns (`user.*`, `settings.*.enabled`)
 - **Conditional Triggers** — Fire only when conditions are met (equals, greaterThan, contains, etc.)
 - **Rate Limiting** — Built-in debounce and throttle support
 - **React Hooks** — `useWarm`, `useCold`, `useStorage`, `useSecure` for declarative usage
 - **Secure Storage** — iOS Keychain / Android Keystore integration with biometric auth
-- **MFE Tracking** — Track micro-frontend loading states and lifecycle
 - **Native Performance** — C++ implementation via [Nitro Modules](https://github.com/mrousavy/nitro)
 
 ## Table of Contents
 
 - [Installation](#installation)
 - [Quick Start](#quick-start)
-- [MMKV (Warm Storage)](#mmkv-warm-storage)
-- [SQLite (Cold Storage)](#sqlite-cold-storage)
+- [Warm Storage](#warm-storage)
+- [Cold Storage](#cold-storage)
 - [Secure Storage](#secure-storage)
 - [React Hooks](#react-hooks)
-- [MFE State Tracking](#mfe-state-tracking)
 - [API Overview](#api-overview)
 - [Documentation](#documentation)
 
@@ -192,64 +188,72 @@ No additional setup required — auto-links with React Native.
 
 ### Initialize Storage
 
+Both default Warm and Cold storage instances are **auto-initialized** on first use — no setup required on iOS!
+
 ```typescript
-import { SideFx } from 'react-native-s-a-m';
+import { Air } from 'react-native-s-a-m';
 import { Platform } from 'react-native';
 
-// Android requires setting the MMKV path first
+// Android requires setting the Warm path first
 if (Platform.OS === 'android') {
-  SideFx.setMMKVRootPath('/data/data/com.yourapp/files/mmkv');
+  Air.setWarmRootPath('/data/data/com.yourapp/files/mmkv');
 }
 
-// Initialize MMKV instances
-SideFx.initializeMMKV('default');
+// Start using Warm immediately — no initialization needed!
+Air.setWarm('user.name', 'John');
 
-// Initialize SQLite database
-SideFx.initializeSQLite('app-db', '/path/to/database.db');
+// Start using Cold storage immediately — also auto-initializes!
+Air.executeCold('CREATE TABLE IF NOT EXISTS users (id INTEGER PRIMARY KEY, name TEXT)');
+Air.executeCold('INSERT INTO users (name) VALUES (?)', ['John']);
+const users = Air.queryCold<{id: number, name: string}[]>('SELECT * FROM users');
+
+// Initialize additional instances if needed
+Air.initializeWarm('app-settings');
+Air.initializeCold('orders-db', '/path/to/orders.db');
 ```
 
-> **Note:** S.A.M uses MMKVCore directly and does NOT require `react-native-mmkv`. However, if you also use `react-native-mmkv` v4, both libraries share the same storage files for seamless integration.
+> **Note:** S.A.M uses MMKVCore directly for Warm storage and does NOT require `react-native-mmkv`. However, if you also use `react-native-mmkv` v4, both libraries share the same storage files for seamless integration.
 
 ---
 
-## MMKV (Warm Storage)
+## Warm Storage
 
 Fast key-value storage for frequently accessed data.
 
 ### Basic Operations
 
 ```typescript
-import { SideFx } from 'react-native-s-a-m';
+import { Air } from 'react-native-s-a-m';
 
 // Set values (string, number, or boolean)
-SideFx.setMMKV('user.name', 'John Doe');
-SideFx.setMMKV('user.age', 28);
-SideFx.setMMKV('user.premium', true);
-SideFx.setMMKV('settings.theme', 'dark');
+Air.setWarm('user.name', 'John Doe');
+Air.setWarm('user.age', 28);
+Air.setWarm('user.premium', true);
+Air.setWarm('settings.theme', 'dark');
 
 // Get values
-const name = SideFx.getMMKV('user.name');      // 'John Doe'
-const age = SideFx.getMMKV('user.age');        // 28
-const isPremium = SideFx.getMMKV('user.premium'); // true
+const name = Air.getWarm('user.name');      // 'John Doe'
+const age = Air.getWarm('user.age');        // 28
+const isPremium = Air.getWarm('user.premium'); // true
 
 // Delete values
-SideFx.deleteMMKV('user.name');
+Air.deleteWarm('user.name');
 
 // Use named instances
-SideFx.initializeMMKV('secure');
-SideFx.setMMKV('api.token', 'abc123', 'secure');
+Air.initializeWarm('secure');
+Air.setWarm('api.token', 'abc123', 'secure');
 ```
 
 ### Reactive Listeners
 
 ```typescript
-import { SideFx } from 'react-native-s-a-m';
+import { Air } from 'react-native-s-a-m';
 
 // Watch specific keys
-SideFx.addListener(
+Air.addListener(
   'user-watcher',
   {
-    mmkv: {
+    warm: {
       keys: ['user.name', 'user.email', 'user.avatar'],
     },
   },
@@ -259,10 +263,10 @@ SideFx.addListener(
 );
 
 // Watch with glob patterns
-SideFx.addListener(
+Air.addListener(
   'settings-watcher',
   {
-    mmkv: {
+    warm: {
       patterns: ['settings.*', 'preferences.*.enabled'],
     },
   },
@@ -272,10 +276,10 @@ SideFx.addListener(
 );
 
 // Watch with conditions
-SideFx.addListener(
+Air.addListener(
   'cart-total-watcher',
   {
-    mmkv: {
+    warm: {
       keys: ['cart.total'],
       conditions: [
         { type: 'greaterThan', value: 100 }
@@ -289,10 +293,10 @@ SideFx.addListener(
 );
 
 // With debounce for rapid changes
-SideFx.addListener(
+Air.addListener(
   'search-watcher',
   {
-    mmkv: {
+    warm: {
       keys: ['search.query'],
     },
     options: {
@@ -305,22 +309,22 @@ SideFx.addListener(
 );
 
 // Remove listener when done
-SideFx.removeListener('user-watcher');
+Air.removeListener('user-watcher');
 ```
 
 ---
 
-## SQLite (Cold Storage)
+## Cold Storage
 
 Persistent relational data with SQL queries.
 
 ### Basic Operations
 
 ```typescript
-import { SideFx } from 'react-native-s-a-m';
+import { Air } from 'react-native-s-a-m';
 
 // Create tables
-SideFx.executeSQLite(`
+Air.executeCold(`
   CREATE TABLE IF NOT EXISTS users (
     id INTEGER PRIMARY KEY AUTOINCREMENT,
     name TEXT NOT NULL,
@@ -329,7 +333,7 @@ SideFx.executeSQLite(`
   )
 `);
 
-SideFx.executeSQLite(`
+Air.executeCold(`
   CREATE TABLE IF NOT EXISTS orders (
     id INTEGER PRIMARY KEY AUTOINCREMENT,
     user_id INTEGER,
@@ -340,7 +344,7 @@ SideFx.executeSQLite(`
 `);
 
 // Insert data
-SideFx.executeSQLite(
+Air.executeCold(
   'INSERT INTO users (name, email) VALUES (?, ?)',
   ['John Doe', 'john@example.com']
 );
@@ -353,33 +357,33 @@ interface User {
   created_at: string;
 }
 
-const users = SideFx.querySQLite<User[]>('SELECT * FROM users');
+const users = Air.queryCold<User[]>('SELECT * FROM users');
 
-const user = SideFx.querySQLite<User[]>(
+const user = Air.queryCold<User[]>(
   'SELECT * FROM users WHERE id = ?',
   [1]
 )?.[0];
 
 // Update data
-SideFx.executeSQLite(
+Air.executeCold(
   'UPDATE users SET name = ? WHERE id = ?',
   ['Jane Doe', 1]
 );
 
 // Delete data
-SideFx.executeSQLite('DELETE FROM users WHERE id = ?', [1]);
+Air.executeCold('DELETE FROM users WHERE id = ?', [1]);
 ```
 
 ### Reactive Listeners
 
 ```typescript
-import { SideFx } from 'react-native-s-a-m';
+import { Air } from 'react-native-s-a-m';
 
 // Watch all changes to a table
-SideFx.addListener(
+Air.addListener(
   'users-watcher',
   {
-    sqlite: {
+    cold: {
       table: 'users',
       operations: ['INSERT', 'UPDATE', 'DELETE'],
     },
@@ -391,10 +395,10 @@ SideFx.addListener(
 );
 
 // Watch specific columns
-SideFx.addListener(
+Air.addListener(
   'order-status-watcher',
   {
-    sqlite: {
+    cold: {
       table: 'orders',
       columns: ['status'],
       operations: ['UPDATE'],
@@ -406,10 +410,10 @@ SideFx.addListener(
 );
 
 // Watch with row conditions
-SideFx.addListener(
+Air.addListener(
   'high-value-orders',
   {
-    sqlite: {
+    cold: {
       table: 'orders',
       operations: ['INSERT'],
       where: [
@@ -543,10 +547,10 @@ function LoginScreen() {
 
 ## React Hooks
 
-### useWarm — Watch MMKV Changes
+### useWarm — Watch Warm Changes
 
 ```typescript
-import { useWarm, SideFx } from 'react-native-s-a-m';
+import { useWarm, Air } from 'react-native-s-a-m';
 
 function UserProfile() {
   // Re-renders when any watched key changes
@@ -563,8 +567,8 @@ function UserProfile() {
     }
   );
 
-  const name = SideFx.getMMKV('user.name');
-  const email = SideFx.getMMKV('user.email');
+  const name = Air.getWarm('user.name');
+  const email = Air.getWarm('user.email');
 
   return (
     <View>
@@ -579,10 +583,10 @@ function UserProfile() {
 }
 ```
 
-### useCold — Watch SQLite Changes
+### useCold — Watch Cold Storage Changes
 
 ```typescript
-import { useCold, SideFx } from 'react-native-s-a-m';
+import { useCold, Air } from 'react-native-s-a-m';
 
 function OrdersList() {
   const { lastChange, refresh } = useCold(
@@ -596,7 +600,7 @@ function OrdersList() {
     }
   );
 
-  const orders = SideFx.querySQLite<Order[]>(
+  const orders = Air.queryCold<Order[]>(
     'SELECT * FROM orders ORDER BY created_at DESC'
   );
 
@@ -611,10 +615,10 @@ function OrdersList() {
 }
 ```
 
-### useStorage — Watch Both MMKV and SQLite
+### useStorage — Watch Both Warm and Cold
 
 ```typescript
-import { useStorage, SideFx } from 'react-native-s-a-m';
+import { useStorage, Air } from 'react-native-s-a-m';
 
 function UserOrders() {
   const { lastSource } = useStorage(
@@ -637,77 +641,13 @@ function UserOrders() {
     }
   );
 
-  const userId = SideFx.getMMKV('auth.userId');
-  const orders = SideFx.querySQLite<Order[]>(
+  const userId = Air.getWarm('auth.userId');
+  const orders = Air.queryCold<Order[]>(
     'SELECT * FROM orders WHERE user_id = ?',
     [userId]
   );
 
   return <OrderList orders={orders} />;
-}
-```
-
----
-
-## MFE State Tracking
-
-Track micro-frontend loading states across your app.
-
-```typescript
-import {
-  initializeMFERegistry,
-  markMFELoading,
-  markMFELoaded,
-  markMFEMounted,
-  markMFEUnmounted,
-  markMFEError,
-  useMFEState,
-  useMFEStates,
-} from 'react-native-s-a-m';
-
-// Initialize at app start
-initializeMFERegistry();
-
-// Track MFE lifecycle
-async function loadMFE(mfeId: string) {
-  markMFELoading(mfeId);
-
-  try {
-    const module = await import(`./mfes/${mfeId}`);
-    markMFELoaded(mfeId, module.version);
-    return module;
-  } catch (error) {
-    markMFEError(mfeId, error.message);
-    throw error;
-  }
-}
-
-// React component to track state
-function MFELoader({ mfeId }: { mfeId: string }) {
-  const { state, metadata, isLoading, isError, isMounted } = useMFEState(mfeId);
-
-  if (isLoading) return <Spinner />;
-  if (isError) return <Error message={metadata?.errorMessage} />;
-  if (isMounted) return <Text>MFE Active (v{metadata?.version})</Text>;
-
-  return <Text>State: {state}</Text>;
-}
-
-// Track multiple MFEs
-function MFEDashboard() {
-  const { getMounted, getLoading, getErrors } = useMFEStates([
-    'checkout',
-    'profile',
-    'cart',
-  ]);
-
-  return (
-    <View>
-      <Text>Active: {getMounted().join(', ')}</Text>
-      <Text>Loading: {getLoading().join(', ')}</Text>
-      <Text>Errors: {getErrors().join(', ')}</Text>
-    </View>
-  );
 }
 ```
 
@@ -719,36 +659,33 @@ function MFEDashboard() {
 
 | Method | Description |
 |--------|-------------|
-| `SideFx.initializeMMKV(id?)` | Initialize MMKV instance |
-| `SideFx.initializeSQLite(name, path)` | Initialize SQLite database |
-| `SideFx.setMMKV(key, value, id?)` | Set MMKV value |
-| `SideFx.getMMKV(key, id?)` | Get MMKV value |
-| `SideFx.deleteMMKV(key, id?)` | Delete MMKV key |
-| `SideFx.executeSQLite(sql, params?, db?)` | Execute SQL statement |
-| `SideFx.querySQLite<T>(sql, params?, db?)` | Query SQLite with types |
+| `Air.initializeWarm(id?)` | Initialize Warm instance (default auto-initializes) |
+| `Air.initializeCold(name, path)` | Initialize Cold storage database (default auto-initializes) |
+| `Air.setWarm(key, value, id?)` | Set Warm value (auto-inits default) |
+| `Air.getWarm(key, id?)` | Get Warm value (auto-inits default) |
+| `Air.deleteWarm(key, id?)` | Delete Warm key (auto-inits default) |
+| `Air.executeCold(sql, params?, db?)` | Execute SQL statement (auto-inits default) |
+| `Air.queryCold<T>(sql, params?, db?)` | Query Cold storage with types (auto-inits default) |
 
 ### Listeners
 
 | Method | Description |
 |--------|-------------|
-| `SideFx.addListener(id, config, callback)` | Add storage listener |
-| `SideFx.removeListener(id)` | Remove listener |
-| `SideFx.pauseListener(id)` | Pause listener |
-| `SideFx.resumeListener(id)` | Resume listener |
-| `SideFx.getListeners()` | Get all listener info |
+| `Air.addListener(id, config, callback)` | Add storage listener |
+| `Air.removeListener(id)` | Remove listener |
+| `Air.pauseListener(id)` | Pause listener |
+| `Air.resumeListener(id)` | Resume listener |
+| `Air.getListeners()` | Get all listener info |
 
 ### React Hooks
 
 | Hook | Description |
 |------|-------------|
-| `useWarm` | Watch MMKV changes |
-| `useCold` | Watch SQLite changes |
+| `useWarm` | Watch Warm changes |
+| `useCold` | Watch Cold storage changes |
 | `useStorage` | Watch both with correlation |
 | `useSecure` | Manage secure storage |
 | `useSecureCredentials` | Watch credential changes |
-| `useMFEState` | Watch single MFE |
-| `useMFEStates` | Watch multiple MFEs |
-| `useMFEControl` | Control MFE lifecycle |
 
 ### Secure Storage
 
@@ -770,6 +707,7 @@ function MFEDashboard() {
 | [React Hooks](./docs/HOOKS.md) | Detailed hooks documentation |
 | [Conditions](./docs/CONDITIONS.md) | Conditional trigger reference |
 | [Secure Storage](./docs/SECURE_STORAGE.md) | Keychain/Keystore guide |
+| [MFE State Tracking](./docs/MFE.md) | Micro-frontend state tracking |
 | [Architecture](./docs/ARCHITECTURE.md) | Technical architecture overview |
 
 ---

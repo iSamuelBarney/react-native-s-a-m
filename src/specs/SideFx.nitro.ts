@@ -39,13 +39,13 @@ export interface Condition {
 }
 
 // ============================================================================
-// MMKV (Warm Storage) Types
+// Warm Storage Types
 // ============================================================================
 
 /**
- * MMKV-specific listener configuration
+ * Warm storage listener configuration
  */
-export interface MMKVListenerConfig {
+export interface WarmListenerConfig {
   keys?: string[];
   patterns?: string[];
   conditions?: Condition[];
@@ -53,16 +53,16 @@ export interface MMKVListenerConfig {
 }
 
 // ============================================================================
-// SQLite (Cold Storage) Types
+// Cold Storage Types
 // ============================================================================
 
 /**
- * SQLite operation types
+ * Cold storage operation types
  */
-export type SQLiteOperation = 'INSERT' | 'UPDATE' | 'DELETE';
+export type ColdOperation = 'INSERT' | 'UPDATE' | 'DELETE';
 
 /**
- * Row condition for SQLite listeners
+ * Row condition for Cold storage listeners
  */
 export interface RowCondition {
   column: string;
@@ -70,12 +70,12 @@ export interface RowCondition {
 }
 
 /**
- * SQLite-specific listener configuration
+ * Cold storage listener configuration
  */
-export interface SQLiteListenerConfig {
+export interface ColdListenerConfig {
   table?: string;
   columns?: string[];
-  operations?: SQLiteOperation[];
+  operations?: ColdOperation[];
   where?: RowCondition[];
   query?: string;
   queryParams?: Array<string | number | null>;
@@ -92,19 +92,19 @@ export interface SQLiteListenerConfig {
 export type CombineLogic = 'AND' | 'OR';
 
 /**
- * Correlation config between MMKV and SQLite
+ * Correlation config between Warm and Cold storage
  */
 export interface CorrelationConfig {
-  mmkvKey: string;
-  sqliteParam: string;
+  warmKey: string;
+  coldParam: string;
 }
 
 /**
  * Configuration for cross-storage listeners
  */
 export interface CombinedListenerConfig {
-  mmkv?: MMKVListenerConfig;
-  sqlite?: SQLiteListenerConfig;
+  warm?: WarmListenerConfig;
+  cold?: ColdListenerConfig;
   logic?: CombineLogic;
   correlation?: CorrelationConfig;
 }
@@ -141,8 +141,8 @@ export interface ListenerOptions {
  * Full listener configuration
  */
 export interface ListenerConfig {
-  mmkv?: MMKVListenerConfig;
-  sqlite?: SQLiteListenerConfig;
+  warm?: WarmListenerConfig;
+  cold?: ColdListenerConfig;
   combined?: CombinedListenerConfig;
   options?: ListenerOptions;
 }
@@ -162,7 +162,7 @@ export type ChangeSource = 'warm' | 'cold' | 'mmkv' | 'sqlite';
 export type ChangeOperation = 'set' | 'delete' | 'insert' | 'update';
 
 /**
- * Row data from SQLite (simplified for C++ compatibility)
+ * Row data from Cold storage (simplified for C++ compatibility)
  */
 export interface RowData {
   json: string; // JSON-encoded row data
@@ -219,6 +219,54 @@ export interface SAMConfig {
   debug?: boolean;
   maxListeners?: number;
   cacheSize?: number;
+}
+
+// ============================================================================
+// Network Types
+// ============================================================================
+
+/**
+ * Network connection status
+ */
+export type NetworkStatus = 'online' | 'offline' | 'unknown';
+
+/**
+ * Network connection type
+ */
+export type ConnectionType =
+  | 'wifi'
+  | 'cellular'
+  | 'ethernet'
+  | 'bluetooth'
+  | 'vpn'
+  | 'none'
+  | 'unknown';
+
+/**
+ * Cellular network generation
+ */
+export type CellularGeneration = '2g' | '3g' | '4g' | '5g' | 'unknown';
+
+/**
+ * Network state information returned from native
+ */
+export interface NetworkState {
+  /** Overall connection status */
+  status: NetworkStatus;
+  /** Connection type (wifi, cellular, etc.) */
+  type: ConnectionType;
+  /** Whether the device has a network connection */
+  isConnected: boolean;
+  /** Whether the internet is reachable (-1 = unknown, 0 = no, 1 = yes) */
+  isInternetReachable: number;
+  /** For cellular: the generation (2g, 3g, 4g, 5g, unknown) */
+  cellularGeneration: CellularGeneration;
+  /** WiFi signal strength 0-100 (-1 if unavailable) */
+  wifiStrength: number;
+  /** Whether the connection is expensive/metered */
+  isConnectionExpensive: boolean;
+  /** Timestamp of the last state update (Unix ms) */
+  timestamp: number;
 }
 
 // ============================================================================
@@ -298,60 +346,60 @@ export interface SideFx extends HybridObject<{ ios: 'c++'; android: 'c++' }> {
   configure(config: SAMConfig): void;
 
   /**
-   * Get the default root directory for MMKV storage
+   * Get the default root directory for Warm storage
    * Returns platform-specific path:
    * - iOS: Library/mmkv
    * - Android: files/mmkv
    */
-  getDefaultMMKVPath(): string;
+  getDefaultWarmPath(): string;
 
   /**
-   * Set the root directory for MMKV storage
-   * Call this once before initializing any MMKV instances
-   * If not called, use getDefaultMMKVPath() to get the platform default
-   * @param rootPath The directory path for MMKV storage files
+   * Set the root directory for Warm storage
+   * Call this once before initializing any Warm instances
+   * If not called, use getDefaultWarmPath() to get the platform default
+   * @param rootPath The directory path for Warm storage files
    */
-  setMMKVRootPath(rootPath: string): void;
+  setWarmRootPath(rootPath: string): void;
 
   /**
-   * Initialize MMKV adapter
-   * Must be called before MMKV listeners will work
-   * @param instanceId MMKV instance ID (default: "default")
+   * Initialize Warm adapter
+   * Must be called before Warm listeners will work
+   * @param instanceId Warm instance ID (default: "default")
    */
-  initializeMMKV(instanceId?: string): ListenerResult;
+  initializeWarm(instanceId?: string): ListenerResult;
 
   /**
-   * Initialize SQLite adapter
-   * Must be called before SQLite listeners will work
+   * Initialize Cold storage adapter
+   * Must be called before Cold storage listeners will work
    * @param databaseName Database name
    * @param databasePath Path to the database file
    */
-  initializeSQLite(databaseName: string, databasePath: string): ListenerResult;
+  initializeCold(databaseName: string, databasePath: string): ListenerResult;
 
   /**
-   * Check if MMKV is initialized
-   * @param instanceId Optional MMKV instance ID to check
+   * Check if Warm storage is initialized
+   * @param instanceId Optional Warm instance ID to check
    */
-  isMMKVInitialized(instanceId?: string): boolean;
+  isWarmInitialized(instanceId?: string): boolean;
 
   /**
-   * Check if SQLite is initialized
+   * Check if Cold storage is initialized
    * @param databaseName Optional specific database to check
    */
-  isSQLiteInitialized(databaseName?: string): boolean;
+  isColdInitialized(databaseName?: string): boolean;
 
   /**
-   * Manually trigger a check for MMKV changes
-   * Useful if using a custom MMKV setup
+   * Manually trigger a check for Warm storage changes
+   * Useful if using a custom Warm setup
    */
-  checkMMKVChanges(): void;
+  checkWarmChanges(): void;
 
   /**
-   * Manually trigger a check for SQLite changes
+   * Manually trigger a check for Cold storage changes
    * @param databaseName Database to check
    * @param table Optional specific table to check
    */
-  checkSQLiteChanges(databaseName: string, table?: string): void;
+  checkColdChanges(databaseName: string, table?: string): void;
 
   /**
    * Get current debug mode status
@@ -374,57 +422,138 @@ export interface SideFx extends HybridObject<{ ios: 'c++'; android: 'c++' }> {
   // ============================================================================
 
   /**
-   * Set a value in MMKV storage
+   * Set a value in Warm storage
    * @param key The key to set
    * @param value The value to set (string, number, boolean)
-   * @param instanceId Optional MMKV instance ID (default: "default")
+   * @param instanceId Optional Warm instance ID (default: "default")
    * @returns Result indicating success or failure
    */
-  setMMKV(
+  setWarm(
     key: string,
     value: string | number | boolean,
     instanceId?: string
   ): ListenerResult;
 
   /**
-   * Get a value from MMKV storage
+   * Get a value from Warm storage
    * @param key The key to get
-   * @param instanceId Optional MMKV instance ID (default: "default")
+   * @param instanceId Optional Warm instance ID (default: "default")
    * @returns The value or null if not found
    */
-  getMMKV(key: string, instanceId?: string): string | number | boolean | null;
+  getWarm(key: string, instanceId?: string): string | number | boolean | null;
 
   /**
-   * Delete a key from MMKV storage
+   * Delete a key from Warm storage
    * @param key The key to delete
-   * @param instanceId Optional MMKV instance ID (default: "default")
+   * @param instanceId Optional Warm instance ID (default: "default")
    * @returns Result indicating success or failure
    */
-  deleteMMKV(key: string, instanceId?: string): ListenerResult;
+  deleteWarm(key: string, instanceId?: string): ListenerResult;
 
   /**
-   * Execute a SQL statement on SQLite storage
+   * Execute a SQL statement on Cold storage
    * @param sql The SQL statement to execute
    * @param params Optional parameters for the statement
    * @param databaseName Optional database name (default: "default")
    * @returns Result indicating success or failure
    */
-  executeSQLite(
+  executeCold(
     sql: string,
     params?: Array<string | number | boolean | null>,
     databaseName?: string
   ): ListenerResult;
 
   /**
-   * Query SQLite storage and return results as JSON
+   * Query Cold storage and return results as JSON
    * @param sql The SQL query to execute
    * @param params Optional parameters for the query
    * @param databaseName Optional database name (default: "default")
    * @returns JSON string of query results or null on error
    */
-  querySQLite(
+  queryCold(
     sql: string,
     params?: Array<string | number | boolean | null>,
     databaseName?: string
   ): string | null;
+
+  // ============================================================================
+  // Network Monitoring Methods
+  // ============================================================================
+
+  /**
+   * Start monitoring network status changes
+   * Must be called before network listeners will receive updates
+   * @returns Result indicating success or failure
+   */
+  startNetworkMonitoring(): ListenerResult;
+
+  /**
+   * Stop monitoring network status changes
+   * @returns Result indicating success or failure
+   */
+  stopNetworkMonitoring(): ListenerResult;
+
+  /**
+   * Check if network monitoring is active
+   * @returns True if monitoring is active
+   */
+  isNetworkMonitoringActive(): boolean;
+
+  /**
+   * Get the current network state
+   * @returns Current network state information
+   */
+  getNetworkState(): NetworkState;
+
+  /**
+   * Force a refresh of the network state
+   * Useful for getting the latest state on demand
+   */
+  refreshNetworkState(): void;
+
+  /**
+   * Enable or disable active ping mode for internet quality measurement
+   *
+   * In ACTIVE mode (debug/simulator): Periodically pings external endpoints
+   * to measure latency. Uses multiple endpoints (Google, Apple) in round-robin.
+   *
+   * In PASSIVE mode (production default): Relies on the app to report
+   * network latency via reportNetworkLatency() from actual API calls.
+   * This avoids unnecessary network requests and privacy concerns.
+   *
+   * @param enabled True to enable active pinging, false for passive mode
+   */
+  setActivePingMode(enabled: boolean): void;
+
+  /**
+   * Report observed network latency from app's own network calls
+   *
+   * Call this from your networking layer (fetch interceptor, Axios interceptor, etc.)
+   * to update internet quality based on actual app traffic.
+   *
+   * In passive mode (production), this is the primary way to measure internet quality.
+   * In active mode, this supplements the periodic pings with real-world data.
+   *
+   * @param latencyMs The observed latency in milliseconds
+   */
+  reportNetworkLatency(latencyMs: number): void;
+
+  /**
+   * Report a network failure from app's own network calls
+   *
+   * Call this when a network request fails due to connectivity issues.
+   * This sets INTERNET_REACHABLE to false and triggers offline recovery checks.
+   *
+   * @example
+   * ```typescript
+   * try {
+   *   await fetch('/api/data');
+   * } catch (error) {
+   *   if (isNetworkError(error)) {
+   *     Air.reportNetworkFailure();
+   *   }
+   * }
+   * ```
+   */
+  reportNetworkFailure(): void;
 }

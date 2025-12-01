@@ -8,7 +8,7 @@ Conditions allow you to filter when listeners fire based on value criteria. Inst
 - [Condition Structure](#condition-structure)
 - [Usage Examples](#usage-examples)
 - [Combining Conditions](#combining-conditions)
-- [Row Conditions (SQLite)](#row-conditions-sqlite)
+- [Row Conditions (Cold Storage)](#row-conditions-cold-storage)
 
 ---
 
@@ -287,9 +287,9 @@ useWarm({
 
 ---
 
-## Row Conditions (SQLite)
+## Row Conditions (Cold Storage)
 
-For SQLite listeners, use `RowCondition` to filter based on row data.
+For Cold storage listeners, use `RowCondition` to filter based on row data.
 
 ### Structure
 

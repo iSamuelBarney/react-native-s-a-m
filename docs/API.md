@@ -7,7 +7,7 @@ Complete API reference for the SideFx low-level API.
 - [Initialization](#initialization)
 - [Listener Management](#listener-management)
 - [MMKV Storage](#mmkv-storage)
-- [SQLite Storage](#sqlite-storage)
+- [Cold Storage](#cold-storage)
 - [Secure Storage](#secure-storage)
 - [MFE State Tracking](#mfe-state-tracking)
 - [Configuration](#configuration)
@@ -105,12 +105,12 @@ SideFx.initializeMMKV('sam-mfe-registry');  // MFE tracking instance
 
 ---
 
-### initializeSQLite
+### initializeCold
 
-Initialize SQLite storage adapter. Must be called before SQLite listeners will work.
+Initialize Cold storage adapter. Must be called before Cold storage listeners will work.
 
 ```typescript
-SideFx.initializeSQLite(databaseName: string, databasePath: string): ListenerResult
+Air.initializeCold(databaseName: string, databasePath: string): ListenerResult
 ```
 
 **Parameters:**
@@ -123,8 +123,8 @@ SideFx.initializeSQLite(databaseName: string, databasePath: string): ListenerRes
 
 **Example:**
 ```typescript
-SideFx.initializeSQLite('app-db', '/data/app.db');
-SideFx.initializeSQLite('cache-db', '/tmp/cache.db');
+Air.initializeCold('app-db', '/data/app.db');
+Air.initializeCold('cache-db', '/tmp/cache.db');
 ```
 
 ---
@@ -139,12 +139,12 @@ SideFx.isMMKVInitialized(instanceId?: string): boolean
 
 ---
 
-### isSQLiteInitialized
+### isColdInitialized
 
-Check if SQLite adapter is initialized.
+Check if Cold storage adapter is initialized.
 
 ```typescript
-SideFx.isSQLiteInitialized(databaseName?: string): boolean
+Air.isColdInitialized(databaseName?: string): boolean
 ```
 
 ---
@@ -353,14 +353,14 @@ SideFx.deleteMMKV(key: string, instanceId?: string): ListenerResult
 
 ---
 
-## SQLite Storage
+## Cold Storage
 
-### executeSQLite
+### executeCold
 
 Execute a SQL statement (INSERT, UPDATE, DELETE, CREATE, etc.).
 
 ```typescript
-SideFx.executeSQLite(
+Air.executeCold(
   sql: string,
   params?: Array<string | number | boolean | null>,
   databaseName?: string
@@ -377,7 +377,7 @@ SideFx.executeSQLite(
 **Example:**
 ```typescript
 // Create table
-SideFx.executeSQLite(`
+Air.executeCold(`
   CREATE TABLE IF NOT EXISTS users (
     id INTEGER PRIMARY KEY AUTOINCREMENT,
     name TEXT NOT NULL,
@@ -387,19 +387,19 @@ SideFx.executeSQLite(`
 `);
 
 // Insert with parameters
-SideFx.executeSQLite(
+Air.executeCold(
   'INSERT INTO users (name, email) VALUES (?, ?)',
   ['John Doe', 'john@example.com']
 );
 
 // Update
-SideFx.executeSQLite(
+Air.executeCold(
   'UPDATE users SET name = ? WHERE id = ?',
   ['Jane Doe', 1]
 );
 
 // Delete
-SideFx.executeSQLite(
+Air.executeCold(
   'DELETE FROM users WHERE id = ?',
   [1]
 );
@@ -407,12 +407,12 @@ SideFx.executeSQLite(
 
 ---
 
-### querySQLite
+### queryCold
 
-Query SQLite storage and return results.
+Query Cold storage and return results.
 
 ```typescript
-SideFx.querySQLite<T = unknown>(
+Air.queryCold<T = unknown>(
   sql: string,
   params?: Array<string | number | boolean | null>,
   databaseName?: string
@@ -430,16 +430,16 @@ interface User {
 }
 
 // Query all users
-const users = SideFx.querySQLite<User[]>('SELECT * FROM users');
+const users = Air.queryCold<User[]>('SELECT * FROM users');
 
 // Query with parameters
-const user = SideFx.querySQLite<User[]>(
+const user = Air.queryCold<User[]>(
   'SELECT * FROM users WHERE id = ?',
   [1]
 );
 
 // Query with multiple conditions
-const activeUsers = SideFx.querySQLite<User[]>(
+const activeUsers = Air.queryCold<User[]>(
   'SELECT * FROM users WHERE active = ? AND role = ?',
   [true, 'admin']
 );
@@ -852,12 +852,12 @@ SideFx.checkMMKVChanges(): void
 
 ---
 
-### checkSQLiteChanges
+### checkColdChanges
 
-Manually trigger SQLite change detection.
+Manually trigger Cold storage change detection.
 
 ```typescript
-SideFx.checkSQLiteChanges(databaseName: string, table?: string): void
+Air.checkColdChanges(databaseName: string, table?: string): void
 ```
 
 ---
@@ -877,31 +877,31 @@ interface ListenerResult {
 
 ```typescript
 interface ListenerConfig {
-  mmkv?: MMKVListenerConfig;
-  sqlite?: SQLiteListenerConfig;
+  warm?: WarmListenerConfig;
+  cold?: ColdListenerConfig;
   combined?: CombinedListenerConfig;
   options?: ListenerOptions;
 }
 ```
 
-### MMKVListenerConfig
+### WarmListenerConfig
 
 ```typescript
-interface MMKVListenerConfig {
+interface WarmListenerConfig {
   keys?: string[];           // Exact keys to watch
   patterns?: string[];       // Glob patterns
   conditions?: Condition[];  // Conditional triggers
-  instanceId?: string;       // MMKV instance (default: "default")
+  instanceId?: string;       // Warm instance (default: "default")
 }
 ```
 
-### SQLiteListenerConfig
+### ColdListenerConfig
 
 ```typescript
-interface SQLiteListenerConfig {
+interface ColdListenerConfig {
   table?: string;                    // Table to watch
   columns?: string[];                // Specific columns
-  operations?: SQLiteOperation[];    // INSERT, UPDATE, DELETE
+  operations?: ColdOperation[];      // INSERT, UPDATE, DELETE
   where?: RowCondition[];            // Row-level conditions
   query?: string;                    // Watch query results
   queryParams?: Array<string | number | null>;
@@ -950,10 +950,10 @@ interface ListenerInfo {
 }
 ```
 
-### SQLiteOperation
+### ColdOperation
 
 ```typescript
-type SQLiteOperation = 'INSERT' | 'UPDATE' | 'DELETE';
+type ColdOperation = 'INSERT' | 'UPDATE' | 'DELETE';
 ```
 
 ### Condition
