@@ -1,14 +1,14 @@
 /**
  * S.A.M - MFE (Micro Frontend) State Tracker
  *
- * Provides MMKV-based state tracking for federated modules.
+ * Provides Warm storage-based state tracking for federated modules.
  * Tracks loading states, versions, and mount/unmount events.
  *
  * Falls back to in-memory storage if native module is unavailable.
  */
-import { SideFx } from './SideFx';
+import { Air } from './SideFx';
 
-// MMKV instance ID for MFE state tracking
+// Warm instance ID for MFE state tracking
 export const MFE_INSTANCE_ID = 'sam-mfe-registry';
 
 // Key prefix for MFE states
@@ -25,7 +25,7 @@ type FallbackListener = (key: string, value: string | number | boolean | null) =
 const _fallbackListeners: Set<FallbackListener> = new Set();
 
 /**
- * Check if the native SideFx module is fully available
+ * Check if the native Air module is fully available
  */
 function isNativeAvailable(): boolean {
   if (_nativeAvailable !== null) {
@@ -34,13 +34,13 @@ function isNativeAvailable(): boolean {
 
   try {
     // Try to call a method to see if native is available
-    SideFx.isMMKVInitialized(MFE_INSTANCE_ID);
+    Air.isWarmInitialized(MFE_INSTANCE_ID);
     _nativeAvailable = true;
-    console.log('[SAM] Native SideFx module is available');
+    console.log('[SAM] Native Air module is available');
   } catch {
     _nativeAvailable = false;
     console.warn(
-      '[SAM] Native SideFx module not available. ' +
+      '[SAM] Native Air module not available. ' +
       'Using in-memory fallback store. Rebuild the native app for persistence.'
     );
   }
@@ -93,54 +93,54 @@ export interface MFEMetadata {
   loadTimeMs?: number;
 }
 
-// Track if MMKV root path has been set
-let _mmkvRootPathSet = false;
+// Track if Warm root path has been set
+let _warmRootPathSet = false;
 
 /**
- * Set the MMKV root path for all S.A.M instances
+ * Set the Warm root path for all S.A.M instances
  * On iOS this is optional (auto-detected), on Android it's required.
  *
- * @param rootPath The directory path for MMKV storage files
+ * @param rootPath The directory path for Warm storage files
  *
  * @example
  * ```typescript
  * // Only needed on Android:
  * import { Platform } from 'react-native';
  * if (Platform.OS === 'android') {
- *   setMMKVRootPath('/data/data/com.yourapp/files/mmkv');
+ *   setWarmRootPath('/data/data/com.yourapp/files/mmkv');
  * }
  * ```
  */
-export function setMMKVRootPath(rootPath: string): void {
-  if (_mmkvRootPathSet) {
-    console.warn('[SAM] MMKV root path already set');
+export function setWarmRootPath(rootPath: string): void {
+  if (_warmRootPathSet) {
+    console.warn('[SAM] Warm root path already set');
     return;
   }
-  SideFx.setMMKVRootPath(rootPath);
-  _mmkvRootPathSet = true;
+  Air.setWarmRootPath(rootPath);
+  _warmRootPathSet = true;
 }
 
 /**
- * Initialize the MFE registry MMKV instance
+ * Initialize the MFE registry Warm instance
  * Call this early in your app initialization
  *
- * On iOS, MMKV path is auto-detected (Library/mmkv)
- * On Android, call setMMKVRootPath first if not already done
+ * On iOS, Warm path is auto-detected (Library/mmkv)
+ * On Android, call setWarmRootPath first if not already done
  *
- * @param mmkvRootPath Optional root directory for MMKV storage (required on Android if not set)
+ * @param warmRootPath Optional root directory for Warm storage (required on Android if not set)
  */
-export function initializeMFERegistry(mmkvRootPath?: string): void {
+export function initializeMFERegistry(warmRootPath?: string): void {
   if (!isNativeAvailable()) return;
 
   try {
-    // Set MMKV root path if provided and not already set
-    if (mmkvRootPath && !_mmkvRootPathSet) {
-      SideFx.setMMKVRootPath(mmkvRootPath);
-      _mmkvRootPathSet = true;
+    // Set Warm root path if provided and not already set
+    if (warmRootPath && !_warmRootPathSet) {
+      Air.setWarmRootPath(warmRootPath);
+      _warmRootPathSet = true;
     }
 
-    if (!SideFx.isMMKVInitialized(MFE_INSTANCE_ID)) {
-      const result = SideFx.initializeMMKV(MFE_INSTANCE_ID);
+    if (!Air.isWarmInitialized(MFE_INSTANCE_ID)) {
+      const result = Air.initializeWarm(MFE_INSTANCE_ID);
       if (!result.success) {
         console.warn('[SAM] Failed to initialize MFE registry:', result.error);
       }
@@ -151,7 +151,7 @@ export function initializeMFERegistry(mmkvRootPath?: string): void {
 }
 
 /**
- * Get the MMKV key for an MFE
+ * Get the Warm key for an MFE
  */
 function getMFEKey(mfeId: string): string {
   return `${MFE_KEY_PREFIX}${mfeId}`;
@@ -180,7 +180,7 @@ export function getMFEState(mfeId: string): MFEState {
 
   try {
     initializeMFERegistry();
-    const value = SideFx.getMMKV(key, MFE_INSTANCE_ID);
+    const value = Air.getWarm(key, MFE_INSTANCE_ID);
     return (value as MFEState) ?? '';
   } catch {
     return '';
@@ -211,7 +211,7 @@ export function getMFEMetadata(mfeId: string): MFEMetadata | null {
 
   try {
     initializeMFERegistry();
-    const metaJson = SideFx.getMMKV(metaKey, MFE_INSTANCE_ID);
+    const metaJson = Air.getWarm(metaKey, MFE_INSTANCE_ID);
     if (!metaJson || typeof metaJson !== 'string') {
       const state = getMFEState(mfeId);
       return state ? { state } : null;
@@ -265,7 +265,7 @@ export function setMFEState(
     initializeMFERegistry();
 
     // Set the simple state value
-    SideFx.setMMKV(stateKey, state, MFE_INSTANCE_ID);
+    Air.setWarm(stateKey, state, MFE_INSTANCE_ID);
 
     // Update metadata if provided
     if (metadata) {
@@ -275,7 +275,7 @@ export function setMFEState(
         ...metadata,
         state,
       };
-      SideFx.setMMKV(
+      Air.setWarm(
         metaKey,
         JSON.stringify(newMeta),
         MFE_INSTANCE_ID
@@ -370,8 +370,8 @@ export function clearMFEState(mfeId: string): void {
 
   try {
     initializeMFERegistry();
-    SideFx.deleteMMKV(stateKey, MFE_INSTANCE_ID);
-    SideFx.deleteMMKV(metaKey, MFE_INSTANCE_ID);
+    Air.deleteWarm(stateKey, MFE_INSTANCE_ID);
+    Air.deleteWarm(metaKey, MFE_INSTANCE_ID);
   } catch (error) {
     console.warn('[SAM] Failed to clear MFE state:', error);
   }

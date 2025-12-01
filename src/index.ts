@@ -1,13 +1,13 @@
 /**
  * S.A.M - State Awareness Manager
  *
- * Reactive listeners for MMKV and SQLite storage changes.
+ * Reactive listeners for Warm and Cold storage changes.
  * Provides pattern-based key matching, conditional triggers,
  * and React hooks for seamless component integration.
  */
 
 // Main API
-export { SideFx } from './SideFx';
+export { Air, SideFx, DEFAULT_COLD_DB_NAME } from './SideFx';
 
 // React Hooks
 export { useWarm, useCold, useStorage } from './hooks';
@@ -16,10 +16,10 @@ export { useWarm, useCold, useStorage } from './hooks';
 export type {
   ConditionType,
   Condition,
-  MMKVListenerConfig,
-  SQLiteOperation,
+  WarmListenerConfig,
+  ColdOperation,
   RowCondition,
-  SQLiteListenerConfig,
+  ColdListenerConfig,
   CombineLogic,
   CorrelationConfig,
   CombinedListenerConfig,
@@ -33,6 +33,11 @@ export type {
   ListenerInfo,
   SAMConfig,
   SideFx as SideFxSpec,
+  // Network types
+  NetworkStatus,
+  ConnectionType,
+  CellularGeneration,
+  NetworkState,
 } from './specs/SideFx.nitro';
 
 // Types for hooks
@@ -60,7 +65,7 @@ export {
   MFERegistry,
   MFE_INSTANCE_ID,
   MFE_KEY_PREFIX,
-  setMMKVRootPath,
+  setWarmRootPath,
   initializeMFERegistry,
   getMFEState,
   getMFEMetadata,
@@ -98,3 +103,13 @@ export type {
 // Secure Storage React Hooks
 export { useSecure, useSecureCredentials } from './useSecure';
 export type { UseSecureConfig, UseSecureResult } from './useSecure';
+
+// Network Monitoring React Hooks
+export { useNetwork, useIsOnline, useNetworkQuality } from './useNetwork';
+export type {
+  UseNetworkResult,
+  UseNetworkConfig,
+  NetworkQuality,
+  InternetQuality,
+  InternetState,
+} from './useNetwork';

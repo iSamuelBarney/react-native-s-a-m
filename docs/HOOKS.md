@@ -190,7 +190,7 @@ function SearchComponent() {
 
 ## useCold
 
-React hook for watching SQLite (cold storage) changes.
+React hook for watching Cold storage changes.
 
 ### Signature
 
@@ -208,7 +208,7 @@ interface UseColdConfig {
   database?: string;              // Database name (default: "default")
   table?: string;                 // Table to watch
   columns?: string[];             // Specific columns to watch
-  operations?: SQLiteOperation[]; // Operations to watch
+  operations?: ColdOperation[];   // Operations to watch
   where?: RowCondition[];         // Row-level conditions
   query?: string;                 // Watch query results instead
   queryParams?: Array<string | number | boolean | null>;
@@ -234,7 +234,7 @@ interface UseColdResult<T> {
   isListening: boolean;
   listenerId: string;
   lastChange: {
-    operation: SQLiteOperation | null;
+    operation: ColdOperation | null;
     rowId: number | null;
     timestamp: number | null;
   };
@@ -272,7 +272,7 @@ function UsersList() {
     operations: ['INSERT', 'UPDATE', 'DELETE']
   });
 
-  const users = SideFx.querySQLite<User[]>('SELECT * FROM users');
+  const users = Air.queryCold<User[]>('SELECT * FROM users');
 
   return (
     <FlatList
@@ -348,7 +348,7 @@ function HighValueOrderWatcher() {
 
 ## useStorage
 
-React hook for watching both MMKV and SQLite with correlation support.
+React hook for watching both Warm and Cold storage with correlation support.
 
 ### Signature
 
@@ -375,12 +375,12 @@ interface UseStorageConfig {
     query?: string;
     queryParams?: Array<string | number | boolean | null>;
     columns?: string[];
-    operations?: SQLiteOperation[];
+    operations?: ColdOperation[];
   };
   logic?: 'AND' | 'OR';  // How to combine triggers (default: 'OR')
   correlation?: {
-    warmKey: string;     // MMKV key to use as SQLite param
-    coldParam: string;   // SQLite parameter name
+    warmKey: string;     // Warm key to use as Cold storage param
+    coldParam: string;   // Cold storage parameter name
   };
   options?: {
     debounceMs?: number;
@@ -449,8 +449,8 @@ function UserOrders() {
     }
   );
 
-  const userId = SideFx.getMMKV('auth.userId');
-  const orders = SideFx.querySQLite<Order[]>(
+  const userId = Air.getWarm('auth.userId');
+  const orders = Air.queryCold<Order[]>(
     'SELECT * FROM orders WHERE user_id = ?',
     [userId]
   );
@@ -846,7 +846,7 @@ function SyncStatus() {
       operations: ['INSERT', 'DELETE']
     },
     () => {
-      const queue = SideFx.querySQLite<{ count: number }[]>(
+      const queue = Air.queryCold<{ count: number }[]>(
         'SELECT COUNT(*) as count FROM sync_queue'
       );
       setSyncCount(queue?.[0]?.count ?? 0);
@@ -953,5 +953,5 @@ interface User {
   name: string;
 }
 
-const users = SideFx.querySQLite<User[]>('SELECT * FROM users');
+const users = Air.queryCold<User[]>('SELECT * FROM users');
 ```

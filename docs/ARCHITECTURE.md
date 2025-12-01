@@ -21,7 +21,7 @@ Technical architecture overview of the State Awareness Manager.
 
 ## Overview
 
-S.A.M is built as a Nitro Module with a C++ core for maximum performance. It provides reactive listeners for MMKV and SQLite storage changes in React Native applications.
+S.A.M is built as a Nitro Module with a C++ core for maximum performance. It provides reactive listeners for Warm and SQLite storage changes in React Native applications.
 
 ### Design Goals
 
@@ -40,7 +40,7 @@ S.A.M is built as a Nitro Module with a C++ core for maximum performance. It pro
 │                                                                             │
 │  ┌─────────────────────┐  ┌─────────────────────┐  ┌─────────────────────┐ │
 │  │    WARM STORAGE     │  │    COLD STORAGE     │  │   SECURE STORAGE    │ │
-│  │       (MMKV)        │  │      (SQLite)       │  │   (Keychain/Store)  │ │
+│  │                     │  │      (SQLite)       │  │   (Keychain/Store)  │ │
 │  ├─────────────────────┤  ├─────────────────────┤  ├─────────────────────┤ │
 │  │                     │  │                     │  │                     │ │
 │  │ • Fast key-value    │  │ • Relational data   │  │ • Credentials       │ │
@@ -50,7 +50,7 @@ S.A.M is built as a Nitro Module with a C++ core for maximum performance. It pro
 │  │                     │  │                     │  │                     │ │
 │  ├─────────────────────┤  ├─────────────────────┤  ├─────────────────────┤ │
 │  │ Hook: useWarm()     │  │ Hook: useCold()     │  │ Hook: useSecure()   │ │
-│  │ API: SideFx.*MMKV() │  │ API: SideFx.*SQL()  │  │ API: SecureStorage  │ │
+│  │ API: Air.*Warm()    │  │ API: Air.*SQL()     │  │ API: SecureStorage  │ │
 │  └─────────────────────┘  └─────────────────────┘  └─────────────────────┘ │
 │                                                                             │
 │  ┌─────────────────────────────────────────────────────────────────────┐   │
@@ -60,7 +60,7 @@ S.A.M is built as a Nitro Module with a C++ core for maximum performance. It pro
 │  │ • Version tracking and load time metrics                            │   │
 │  │ • Error state management                                            │   │
 │  │ • Hooks: useMFEState(), useMFEStates(), useMFEControl()             │   │
-│  │ • Backed by dedicated MMKV instance (sam.mfe)                       │   │
+│  │ • Backed by dedicated Warm instance (sam.mfe)                       │   │
 │  └─────────────────────────────────────────────────────────────────────┘   │
 │                                                                             │
 └─────────────────────────────────────────────────────────────────────────────┘
@@ -74,7 +74,7 @@ S.A.M is built as a Nitro Module with a C++ core for maximum performance. It pro
 | JavaScript API | TypeScript |
 | Native Bridge | Nitro Modules |
 | Core Implementation | C++ |
-| Warm Storage | MMKV (memory-mapped) |
+| Warm Storage | MMKV-backed (memory-mapped) |
 | Cold Storage | SQLite |
 | Secure Storage | iOS Keychain / Android Keystore via react-native-keychain |
 
@@ -93,7 +93,7 @@ S.A.M is built as a Nitro Module with a C++ core for maximum performance. It pro
 │                          JavaScript API                                   │
 │                                                                          │
 │  ┌─────────────────┐  ┌─────────────────┐  ┌─────────────────┐          │
-│  │    SideFx       │  │  SecureStorage  │  │   MFE Registry  │          │
+│  │      Air        │  │  SecureStorage  │  │   MFE Registry  │          │
 │  │  (Storage API)  │  │  (Keychain API) │  │  (State Track)  │          │
 │  └────────┬────────┘  └────────┬────────┘  └────────┬────────┘          │
 └───────────┼────────────────────┼────────────────────┼────────────────────┘
@@ -102,8 +102,8 @@ S.A.M is built as a Nitro Module with a C++ core for maximum performance. It pro
 │                          Native Bridge Layer                              │
 │                                                                          │
 │  ┌─────────────────┐  ┌─────────────────┐  ┌─────────────────┐          │
-│  │  Nitro Modules  │  │ react-native-   │  │    MMKV via     │          │
-│  │  (HybridSideFx) │  │   keychain      │  │     SideFx      │          │
+│  │  Nitro Modules  │  │ react-native-   │  │    Warm via     │          │
+│  │  (HybridSideFx) │  │   keychain      │  │       Air       │          │
 │  └────────┬────────┘  └────────┬────────┘  └────────┬────────┘          │
 └───────────┼────────────────────┼────────────────────┼────────────────────┘
             │                    │                    │
@@ -131,14 +131,14 @@ S.A.M is built as a Nitro Module with a C++ core for maximum performance. It pro
                     ┌────────────────────────────┼────────────────────────────┐
                     │                            │                            │
            ┌────────▼────────┐          ┌────────▼────────┐          ┌────────▼────────┐
-           │    SideFx       │          │  SecureStorage  │          │  MFE Registry   │
+           │      Air        │          │  SecureStorage  │          │  MFE Registry   │
            │  (Storage API)  │          │  (Keychain)     │          │  (State Track)  │
            └────────┬────────┘          └────────┬────────┘          └────────┬────────┘
                     │                            │                            │
      ┌──────────────┼──────────────┐             │                            │
      │              │              │             │                            │
 ┌────▼────┐  ┌──────▼──────┐  ┌────▼────┐  ┌─────▼─────┐              ┌───────▼───────┐
-│Callback │  │Nitro Bridge │  │ Global  │  │  react-   │              │  MMKV Storage │
+│Callback │  │Nitro Bridge │  │ Global  │  │  react-   │              │  Warm Storage │
 │  Map    │  │             │  │ Handler │  │  native-  │              │  (sam.mfe)    │
 │  (JS)   │  │             │  │__SAM_on │  │  keychain │              │               │
 └─────────┘  └──────┬──────┘  │ Change  │  └─────┬─────┘              └───────────────┘
@@ -170,7 +170,7 @@ S.A.M is built as a Nitro Module with a C++ core for maximum performance. It pro
 ```
 1. React: useWarm({ keys: ['user.name'] }, callback)
    │
-2. JavaScript: SideFx.addListener(id, config, callback)
+2. JavaScript: Air.addListener(id, config, callback)
    │
    ├─► Store callback in Map<id, callback>
    │
@@ -188,9 +188,9 @@ S.A.M is built as a Nitro Module with a C++ core for maximum performance. It pro
 ### Change Detection & Notification
 
 ```
-1. Storage: MMKV value changed
+1. Storage: Warm value changed
    │
-2. C++: MMKVAdapter detects change
+2. C++: WarmAdapter detects change
    │
 3. C++: HybridSideFx::evaluateListeners()
    │
@@ -202,7 +202,7 @@ S.A.M is built as a Nitro Module with a C++ core for maximum performance. It pro
    │
 5. JavaScript: __SAM_onChangeEvent(event)
    │
-6. JavaScript: SideFx._onChangeEvent(event)
+6. JavaScript: Air._onChangeEvent(event)
    │
    ├─► Look up callback by listenerId
    ├─► Call callback(event)
@@ -285,7 +285,7 @@ Callbacks are stored in JavaScript (not passed to native):
 ```typescript
 const callbacks = new Map<string, ListenerCallback>();
 
-export const SideFx = {
+export const Air = {
   addListener(id, config, callback) {
     callbacks.set(id, callback);  // Store in JS
     return getNativeSideFx().addListener(id, config);  // Config to native
@@ -298,7 +298,7 @@ export const SideFx = {
 A global handler is registered for native-to-JS communication:
 
 ```typescript
-(globalThis as any).__SAM_onChangeEvent = SideFx._onChangeEvent;
+(globalThis as any).__SAM_onChangeEvent = Air._onChangeEvent;
 ```
 
 ---
@@ -320,8 +320,8 @@ function useWarm(config, callback) {
 
   // Register on mount, cleanup on unmount
   useEffect(() => {
-    SideFx.addListener(id, config, callback);
-    return () => SideFx.removeListener(id);
+    Air.addListener(id, config, callback);
+    return () => Air.removeListener(id);
   }, [config]);
 
   return { pause, resume, refresh };
@@ -334,10 +334,10 @@ Hooks automatically remove listeners when components unmount:
 
 ```typescript
 useEffect(() => {
-  const result = SideFx.addListener(listenerId, config, callback);
+  const result = Air.addListener(listenerId, config, callback);
 
   return () => {
-    SideFx.removeListener(listenerId);  // Cleanup
+    Air.removeListener(listenerId);  // Cleanup
   };
 }, []);
 ```
@@ -346,10 +346,10 @@ useEffect(() => {
 
 ## Storage Adapters
 
-### MMKV Adapter
+### Warm Adapter
 
 ```cpp
-class MMKVAdapter {
+class WarmAdapter {
   std::set<std::string> _instances;
   std::map<std::string, std::map<std::string, Variant>> _cache;
 
@@ -438,7 +438,7 @@ S.A.M includes secure storage capabilities that wrap `react-native-keychain` for
 
 ## MFE State Tracking
 
-S.A.M provides a lightweight system for tracking micro-frontend (MFE) loading states using MMKV storage.
+S.A.M provides a lightweight system for tracking micro-frontend (MFE) loading states using Warm storage.
 
 ### Architecture
 
@@ -457,7 +457,7 @@ S.A.M provides a lightweight system for tracking micro-frontend (MFE) loading st
 └──────────────────────────┬───────────────────────────────────┘
                            │
 ┌──────────────────────────┴───────────────────────────────────┐
-│                    MMKV Storage                              │
+│                    Warm Storage                              │
 │                                                              │
 │   Instance: 'sam.mfe' (dedicated MFE registry)              │
 │   Keys: 'mfe.{mfeId}.state', 'mfe.{mfeId}.metadata'         │
@@ -531,7 +531,7 @@ interface MFEMetadata {
 ```typescript
 interface ChangeEvent {
   listenerId: string;      // Which listener triggered
-  source: ChangeSource;    // 'warm' | 'cold' | 'mmkv' | 'sqlite'
+  source: ChangeSource;    // 'warm' | 'cold' | 'sqlite'
   key?: string;            // For MMKV
   table?: string;          // For SQLite
   rowId?: number;          // For SQLite

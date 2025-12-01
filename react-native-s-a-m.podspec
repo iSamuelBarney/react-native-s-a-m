@@ -30,6 +30,9 @@ Pod::Spec.new do |s|
   # Link SQLite3 (bundled with iOS)
   s.library = "sqlite3"
 
+  # iOS frameworks for network monitoring
+  s.frameworks = "Network", "SystemConfiguration", "CoreTelephony"
+
   # Add Nitrogen generated files
   load 'nitrogen/generated/ios/ReactNativeSAM+autolinking.rb'
   add_nitrogen_files(s)

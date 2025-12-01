@@ -38,34 +38,34 @@ export interface Condition {
 }
 
 // ============================================================================
-// MMKV (Warm Storage) Types
+// Warm Storage Types
 // ============================================================================
 
 /**
- * MMKV-specific listener configuration
+ * Warm storage listener configuration
  */
-export interface MMKVListenerConfig {
+export interface WarmListenerConfig {
   /** Exact keys to watch */
   keys?: string[];
   /** Glob patterns to match keys */
   patterns?: string[];
   /** Conditions that must be met for the listener to fire */
   conditions?: Condition[];
-  /** MMKV instance ID (default: "default") */
+  /** Warm instance ID (default: "default") */
   instanceId?: string;
 }
 
 // ============================================================================
-// SQLite (Cold Storage) Types
+// Cold Storage Types
 // ============================================================================
 
 /**
- * SQLite operation types
+ * Cold storage operation types
  */
-export type SQLiteOperation = 'INSERT' | 'UPDATE' | 'DELETE';
+export type ColdOperation = 'INSERT' | 'UPDATE' | 'DELETE';
 
 /**
- * Row condition for SQLite listeners
+ * Row condition for Cold storage listeners
  */
 export interface RowCondition {
   column: string;
@@ -73,15 +73,15 @@ export interface RowCondition {
 }
 
 /**
- * SQLite-specific listener configuration
+ * Cold storage listener configuration
  */
-export interface SQLiteListenerConfig {
+export interface ColdListenerConfig {
   /** Table to watch */
   table?: string;
   /** Specific columns to watch */
   columns?: string[];
   /** Operation types to watch */
-  operations?: SQLiteOperation[];
+  operations?: ColdOperation[];
   /** Row-level conditions */
   where?: RowCondition[];
   /** Alternative: watch a query's results */
@@ -102,21 +102,21 @@ export interface SQLiteListenerConfig {
 export type CombineLogic = 'AND' | 'OR';
 
 /**
- * Correlation config between MMKV and SQLite
+ * Correlation config between Warm and Cold storage
  */
 export interface CorrelationConfig {
-  mmkvKey: string;
-  sqliteParam: string;
+  warmKey: string;
+  coldParam: string;
 }
 
 /**
  * Configuration for cross-storage listeners
  */
 export interface CombinedListenerConfig {
-  /** MMKV conditions */
-  mmkv?: MMKVListenerConfig;
-  /** SQLite conditions */
-  sqlite?: SQLiteListenerConfig;
+  /** Warm conditions */
+  warm?: WarmListenerConfig;
+  /** Cold storage conditions */
+  cold?: ColdListenerConfig;
   /** How to combine conditions */
   logic?: CombineLogic;
   /** Correlation between warm and cold */
@@ -159,10 +159,10 @@ export interface ListenerOptions {
  * Full listener configuration
  */
 export interface ListenerConfig {
-  /** MMKV-specific configuration */
-  mmkv?: MMKVListenerConfig;
-  /** SQLite-specific configuration */
-  sqlite?: SQLiteListenerConfig;
+  /** Warm-specific configuration */
+  warm?: WarmListenerConfig;
+  /** Cold storage configuration */
+  cold?: ColdListenerConfig;
   /** Combined cross-storage configuration */
   combined?: CombinedListenerConfig;
   /** Behavior options */
@@ -184,7 +184,7 @@ export type ChangeSource = 'warm' | 'cold' | 'mmkv' | 'sqlite';
 export type ChangeOperation = 'set' | 'delete' | 'insert' | 'update';
 
 /**
- * Row data from SQLite (JSON-encoded for cross-platform compatibility)
+ * Row data from Cold storage (JSON-encoded for cross-platform compatibility)
  */
 export interface RowData {
   /** JSON-encoded row data */
@@ -201,9 +201,9 @@ export interface ChangeEvent {
   source: ChangeSource;
   /** For MMKV: the key that changed */
   key?: string;
-  /** For SQLite: the table that changed */
+  /** For Cold storage: the table that changed */
   table?: string;
-  /** For SQLite: the affected row ID */
+  /** For Cold storage: the affected row ID */
   rowId?: number;
   /** Type of operation */
   operation: ChangeOperation;
@@ -211,7 +211,7 @@ export interface ChangeEvent {
   oldValue?: unknown;
   /** New value */
   newValue?: unknown;
-  /** For SQLite: the affected row data (JSON-encoded) */
+  /** For Cold storage: the affected row data (JSON-encoded) */
   row?: RowData;
   /** Timestamp of the change (Unix ms) */
   timestamp: number;
@@ -341,7 +341,7 @@ export interface UseColdConfig {
   /** Specific columns to watch */
   columns?: string[];
   /** Operations to watch */
-  operations?: SQLiteOperation[];
+  operations?: ColdOperation[];
   /** Row conditions */
   where?: RowCondition[];
   /** Alternative: watch a query's results */
@@ -371,7 +371,7 @@ export interface UseColdResult<T> {
   listenerId: string;
   /** Last change info */
   lastChange: {
-    operation: SQLiteOperation | null;
+    operation: ColdOperation | null;
     rowId: number | null;
     timestamp: number | null;
   };
@@ -390,7 +390,7 @@ export interface ColdChangeEvent {
   listenerId: string;
   source: 'cold';
   table: string;
-  operation: SQLiteOperation;
+  operation: ColdOperation;
   rowId: number;
   row?: RowData;
   previousRow?: RowData;
@@ -414,7 +414,7 @@ export interface UseStorageConfig {
     query?: string;
     queryParams?: Array<string | number | boolean | null>;
     columns?: string[];
-    operations?: SQLiteOperation[];
+    operations?: ColdOperation[];
   };
   /** How to combine triggers */
   logic?: CombineLogic;
@@ -467,8 +467,8 @@ export enum SAMErrorCode {
   INVALID_PATTERN = 'E104',
   INVALID_CONDITION = 'E105',
   MAX_LISTENERS_REACHED = 'E106',
-  MMKV_NOT_INITIALIZED = 'E201',
-  SQLITE_NOT_INITIALIZED = 'E202',
+  WARM_NOT_INITIALIZED = 'E201',
+  COLD_NOT_INITIALIZED = 'E202',
   ADAPTER_INIT_FAILED = 'E203',
   LISTENER_NOT_FOUND = 'E301',
   CALLBACK_ERROR = 'E302',
@@ -484,6 +484,105 @@ export interface SAMError {
   message: string;
   suggestion?: string;
   details?: Record<string, unknown>;
+}
+
+// ============================================================================
+// Network Types
+// ============================================================================
+
+/**
+ * Network connection status
+ */
+export type NetworkStatus = 'online' | 'offline' | 'unknown';
+
+/**
+ * Network connection type
+ */
+export type ConnectionType =
+  | 'wifi'
+  | 'cellular'
+  | 'ethernet'
+  | 'bluetooth'
+  | 'vpn'
+  | 'none'
+  | 'unknown';
+
+/**
+ * Cellular network generation
+ */
+export type CellularGeneration = '2g' | '3g' | '4g' | '5g' | 'unknown' | null;
+
+/**
+ * Network state information
+ */
+export interface NetworkState {
+  /** Overall connection status */
+  status: NetworkStatus;
+  /** Connection type (wifi, cellular, etc.) */
+  type: ConnectionType;
+  /** Whether the device has a network connection */
+  isConnected: boolean;
+  /** Whether the internet is reachable (may be null if unknown) */
+  isInternetReachable: boolean | null;
+  /** For cellular: the generation (2g, 3g, 4g, 5g) */
+  cellularGeneration: CellularGeneration;
+  /** WiFi signal strength 0-100 (Android only, -1 if unavailable) */
+  wifiStrength: number;
+  /** Whether the connection is expensive/metered */
+  isConnectionExpensive: boolean;
+  /** Timestamp of the last state update */
+  timestamp: number;
+}
+
+/**
+ * Configuration for useNetwork hook
+ */
+export interface UseNetworkConfig {
+  /** Options for the network listener */
+  options?: {
+    /** Debounce rapid network changes (ms) */
+    debounceMs?: number;
+    /** Throttle callback frequency (ms) */
+    throttleMs?: number;
+    /** Fire immediately with current state on mount */
+    fireImmediately?: boolean;
+    /** Enable debug logging */
+    debug?: boolean;
+  };
+}
+
+/**
+ * Return value from useNetwork hook
+ */
+export interface UseNetworkResult {
+  /** Current network state */
+  state: NetworkState;
+  /** Whether the device is online */
+  isOnline: boolean;
+  /** Whether the device is offline */
+  isOffline: boolean;
+  /** Whether using WiFi */
+  isWifi: boolean;
+  /** Whether using cellular */
+  isCellular: boolean;
+  /** WiFi signal strength (0-100, -1 if unavailable) */
+  wifiStrength: number;
+  /** Cellular generation if on cellular */
+  cellularGeneration: CellularGeneration;
+  /** Force refresh network state */
+  refresh: () => void;
+}
+
+/**
+ * Network change event passed to callbacks
+ */
+export interface NetworkChangeEvent {
+  /** Previous network state */
+  previousState: NetworkState;
+  /** Current network state */
+  currentState: NetworkState;
+  /** Timestamp of the change */
+  timestamp: number;
 }
 
 // ============================================================================

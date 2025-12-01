@@ -6,7 +6,7 @@
 
 > *"State that persists. Storage that reacts."*
 
-S.A.M is a high-performance Nitro Module that provides reactive listeners for storage changes in React Native applications. It enables your components to automatically respond to changes in MMKV (warm storage), SQLite (cold storage), and Secure Storage (Keychain/Keystore) without polling or manual refresh.
+S.A.M is a high-performance Nitro Module that provides reactive listeners for storage changes in React Native applications. It enables your components to automatically respond to changes in Warm storage, Cold storage, and Secure Storage (Keychain/Keystore) without polling or manual refresh.
 
 ## Table of Contents
 
@@ -53,33 +53,41 @@ cd ios && pod install
 
 ### 1. Initialize Storage
 
+Both default Warm and Cold instances are **auto-initialized** - you can start using them immediately without any setup on iOS:
+
 ```typescript
-import { SideFx } from 'react-native-s-a-m';
+import { Air } from 'react-native-s-a-m';
 import { Platform } from 'react-native';
 
-// MMKV Initialization
-// iOS: Path is auto-detected (Library/mmkv) - no setup needed
-// Android: Must set the path first
+// iOS: No setup needed! Default instances auto-initialize on first use.
+
+// Android: Must set the root path before first use
 if (Platform.OS === 'android') {
   // Use your app's files directory + '/mmkv'
-  SideFx.setMMKVRootPath('/data/data/com.yourapp/files/mmkv');
+  Air.setWarmRootPath('/data/data/com.yourapp/files/mmkv');
 }
 
-// Initialize MMKV instances
-SideFx.initializeMMKV('default');
+// Start using Warm storage immediately (no initializeWarm call needed for default)
+Air.setWarm('user.name', 'John');
 
-// Initialize SQLite (cold storage)
-SideFx.initializeSQLite('mydb', '/path/to/database.db');
+// Start using Cold storage immediately (auto-initializes 'sam_default' database)
+Air.executeCold('CREATE TABLE IF NOT EXISTS users (id INTEGER PRIMARY KEY, name TEXT)');
+Air.executeCold('INSERT INTO users (name) VALUES (?)', ['John']);
+const users = Air.queryCold<{id: number, name: string}[]>('SELECT * FROM users');
+
+// Initialize additional instances if needed
+Air.initializeWarm('app-settings');
+Air.initializeCold('orders-db', '/path/to/orders.db');
 ```
 
-> **Note:** S.A.M includes MMKVCore natively and does NOT require `react-native-mmkv`. If you use both libraries, they share the same storage files automatically.
+> **Note:** S.A.M includes MMKVCore natively for Warm storage and does NOT require `react-native-mmkv`. If you use both libraries, they share the same storage files automatically.
 
 ### 2. Use React Hooks
 
 ```typescript
-import { useWarm, useCold } from 'react-native-s-a-m';
+import { useWarm, useCold, Air } from 'react-native-s-a-m';
 
-// Watch MMKV changes
+// Watch Warm changes
 function UserProfile() {
   const { isListening } = useWarm(
     {
@@ -90,11 +98,11 @@ function UserProfile() {
     }
   );
 
-  const name = SideFx.getMMKV('user.name');
+  const name = Air.getWarm('user.name');
   return <Text>{name ?? 'Guest'}</Text>;
 }
 
-// Watch SQLite changes
+// Watch Cold storage changes
 function OrdersList() {
   const { lastChange, refresh } = useCold(
     {
@@ -106,7 +114,7 @@ function OrdersList() {
     }
   );
 
-  const orders = SideFx.querySQLite('SELECT * FROM orders');
+  const orders = Air.queryCold('SELECT * FROM orders');
   return <OrderList data={orders} />;
 }
 ```
@@ -114,17 +122,17 @@ function OrdersList() {
 ### 3. Direct Storage Access
 
 ```typescript
-import { SideFx } from 'react-native-s-a-m';
+import { Air } from 'react-native-s-a-m';
 
-// MMKV operations
-SideFx.setMMKV('user.name', 'John');
-SideFx.setMMKV('settings.theme', 'dark', 'app-settings'); // custom instance
-const name = SideFx.getMMKV('user.name');
-SideFx.deleteMMKV('user.name');
+// Warm operations
+Air.setWarm('user.name', 'John');
+Air.setWarm('settings.theme', 'dark', 'app-settings'); // custom instance
+const name = Air.getWarm('user.name');
+Air.deleteWarm('user.name');
 
-// SQLite operations
-SideFx.executeSQLite('INSERT INTO users (name) VALUES (?)', ['John']);
-const users = SideFx.querySQLite<User[]>('SELECT * FROM users');
+// Cold storage operations
+Air.executeCold('INSERT INTO users (name) VALUES (?)', ['John']);
+const users = Air.queryCold<User[]>('SELECT * FROM users');
 ```
 
 ## Core Concepts
@@ -135,7 +143,7 @@ S.A.M distinguishes between two types of storage:
 
 | Storage Type | Implementation | Use Case | Hook |
 |--------------|----------------|----------|------|
-| **Warm** | MMKV | Frequently accessed data, user preferences, session state | `useWarm` |
+| **Warm** | MMKV-backed | Frequently accessed data, user preferences, session state | `useWarm` |
 | **Cold** | SQLite | Large datasets, relational data, offline-first data | `useCold` |
 
 ### Listener-Based Architecture
@@ -195,9 +203,9 @@ useWarm({
 
 ## Storage Types
 
-### MMKV (Warm Storage)
+### Warm Storage
 
-MMKV is ideal for:
+Warm storage is ideal for:
 - User preferences and settings
 - Authentication tokens
 - UI state persistence
@@ -206,20 +214,20 @@ MMKV is ideal for:
 
 ```typescript
 // Initialize
-SideFx.initializeMMKV('default');
-SideFx.initializeMMKV('secure-store'); // Multiple instances
+Air.initializeWarm('default');
+Air.initializeWarm('secure-store'); // Multiple instances
 
 // Read/Write
-SideFx.setMMKV('key', 'value');
-SideFx.setMMKV('key', 123);
-SideFx.setMMKV('key', true);
-const value = SideFx.getMMKV('key');
-SideFx.deleteMMKV('key');
+Air.setWarm('key', 'value');
+Air.setWarm('key', 123);
+Air.setWarm('key', true);
+const value = Air.getWarm('key');
+Air.deleteWarm('key');
 ```
 
-### SQLite (Cold Storage)
+### Cold Storage
 
-SQLite is ideal for:
+Cold storage is ideal for:
 - Large datasets
 - Relational data
 - Offline-first applications
@@ -228,14 +236,14 @@ SQLite is ideal for:
 
 ```typescript
 // Initialize
-SideFx.initializeSQLite('mydb', '/path/to/db.sqlite');
+Air.initializeCold('mydb', '/path/to/db.sqlite');
 
 // Execute statements
-SideFx.executeSQLite('CREATE TABLE users (id INTEGER PRIMARY KEY, name TEXT)');
-SideFx.executeSQLite('INSERT INTO users (name) VALUES (?)', ['John']);
+Air.executeCold('CREATE TABLE users (id INTEGER PRIMARY KEY, name TEXT)');
+Air.executeCold('INSERT INTO users (name) VALUES (?)', ['John']);
 
 // Query data
-const users = SideFx.querySQLite<User[]>('SELECT * FROM users WHERE active = ?', [true]);
+const users = Air.queryCold<User[]>('SELECT * FROM users WHERE active = ?', [true]);
 ```
 
 ## React Hooks
@@ -244,7 +252,7 @@ S.A.M provides three React hooks for declarative storage watching:
 
 ### useWarm
 
-Watch MMKV (warm storage) changes:
+Watch Warm storage changes:
 
 ```typescript
 const { isListening, pause, resume, refresh } = useWarm(
@@ -269,7 +277,7 @@ const { isListening, pause, resume, refresh } = useWarm(
 
 ### useCold
 
-Watch SQLite (cold storage) changes:
+Watch Cold storage changes:
 
 ```typescript
 const { isListening, lastChange, pause, resume, refresh } = useCold(
@@ -290,7 +298,7 @@ const { isListening, lastChange, pause, resume, refresh } = useCold(
 
 ### useStorage
 
-Watch both MMKV and SQLite with correlation:
+Watch both Warm and Cold storage with correlation:
 
 ```typescript
 const { lastSource, isListening } = useStorage(
@@ -415,7 +423,7 @@ function AuthProvider({ children }) {
 
 ## MFE State Tracking
 
-Track micro-frontend (MFE) loading states and lifecycle events through MMKV storage.
+Track micro-frontend (MFE) loading states and lifecycle events through Warm storage.
 
 ### State Types
 
@@ -528,34 +536,34 @@ MFERegistry.getState('my-mfe');
 
 ## Low-Level API
 
-For advanced use cases, use the SideFx API directly:
+For advanced use cases, use the Air API directly:
 
 ```typescript
-import { SideFx } from 'react-native-s-a-m';
+import { Air } from 'react-native-s-a-m';
 
 // Add a listener
-SideFx.addListener(
+Air.addListener(
   'my-listener',
   {
-    mmkv: { keys: ['user.name'] },
+    warm: { keys: ['user.name'] },
     options: { fireImmediately: true }
   },
   (event) => console.log('Changed:', event)
 );
 
 // Manage listeners
-SideFx.pauseListener('my-listener');
-SideFx.resumeListener('my-listener');
-SideFx.removeListener('my-listener');
-SideFx.removeAllListeners();
+Air.pauseListener('my-listener');
+Air.resumeListener('my-listener');
+Air.removeListener('my-listener');
+Air.removeAllListeners();
 
 // Query listeners
-const listeners = SideFx.getListeners();
-const hasListener = SideFx.hasListener('my-listener');
+const listeners = Air.getListeners();
+const hasListener = Air.hasListener('my-listener');
 
 // Configuration
-SideFx.configure({ debug: true, maxListeners: 100 });
-SideFx.setDebugMode(true);
+Air.configure({ debug: true, maxListeners: 100 });
+Air.setDebugMode(true);
 ```
 
 ## Documentation
@@ -564,6 +572,7 @@ SideFx.setDebugMode(true);
 - [React Hooks](./HOOKS.md) - Detailed hooks documentation
 - [Conditions](./CONDITIONS.md) - Conditional trigger reference
 - [Secure Storage](./SECURE_STORAGE.md) - iOS Keychain / Android Keystore guide
+- [MFE State Tracking](./MFE.md) - Micro-frontend state tracking
 - [Architecture](./ARCHITECTURE.md) - Technical architecture overview
 
 ## License
