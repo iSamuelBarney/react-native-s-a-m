@@ -1,5 +1,5 @@
 <p align="center">
-  <img src="./assets/logo.jpg" alt="S.A.M Logo" />
+  <img src="https://raw.githubusercontent.com/iSamuelBarney/react-native-s-a-m/refs/heads/main/assets/logo.jpg" alt="S.A.M Logo" width="400" />
 </p>
 
 <h1 align="center">react-native-s-a-m</h1>
