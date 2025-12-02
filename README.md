@@ -20,7 +20,7 @@
 
 ---
 
-A high-performance Nitro Module for React Native that provides reactive listeners for Warm and Cold storage changes. Enables automatic component updates when storage changes — no polling, no boilerplate, just reactive persistence.
+A high-performance state management solution for React Native combining native C++ storage (via Nitro Modules) with a lightweight action dispatch system. Provides reactive Warm and Cold storage with automatic component updates, secure credential storage, and Redux-Saga inspired sagas for complex async flows — all in one package.
 
 ## Why S.A.M?
 
@@ -28,7 +28,7 @@ Traditional state managers (Redux, Zustand, Jotai, MobX) were built for web apps
 
 ### S.A.M Exclusive Features
 
-- **Zero JS bundle** — Native C++ via Nitro
+- **Native storage core** — C++ via Nitro for storage operations
 - **Built-in persistence** — No middleware or adapters
 - **Secure storage** — Keychain/Keystore with biometrics
 - **Reactive SQLite** — Cold storage with change listeners
@@ -36,6 +36,7 @@ Traditional state managers (Redux, Zustand, Jotai, MobX) were built for web apps
 - **Conditional triggers** — Fire on `greaterThan`, `contains`, etc.
 - **Built-in debounce/throttle** — No extra setup
 - **Zero hydration delay** — Instant startup
+- **Action system** — Redux-Saga inspired dispatch and sagas
 
 ### Storage-Native Approach
 
@@ -56,7 +57,7 @@ Air.setWarm('user.name', 'John');  // Stored AND reactive — that's it
 - **React Hooks** — `useWarm`, `useCold`, `useStorage`, `useSecure` for declarative usage
 - **Secure Storage** — iOS Keychain / Android Keystore integration with biometric auth
 - **Action System** — Redux-Saga inspired `Missile` for dispatching actions and managing async flows
-- **Native Performance** — C++ implementation via [Nitro Modules](https://github.com/mrousavy/nitro)
+- **Native Storage Performance** — C++ storage implementation via [Nitro Modules](https://github.com/mrousavy/nitro)
 
 ## Table of Contents
 
