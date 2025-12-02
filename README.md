@@ -38,15 +38,56 @@ Traditional state managers (Redux, Zustand, Jotai, MobX) were built for web apps
 - **Zero hydration delay** — Instant startup
 - **Action system** — Redux-Saga inspired dispatch and sagas
 
-### Storage-Native Approach
+---
+
+## Usage
 
 ```typescript
-// Traditional: State + Persistence = Complexity
-// Redux: store → redux-persist → storage adapter → rehydration
+import { Air, Missile, useWarm } from 'react-native-s-a-m';
+const { takeLatest, call, put } = Missile;
 
-// S.A.M: Storage IS State
-Air.setWarm('user.name', 'John');  // Stored AND reactive — that's it
+// ─────────────────────────────────────────────────────────────
+// Storage: Read and write persistent state
+// ─────────────────────────────────────────────────────────────
+Air.setWarm('user.name', 'John');           // Write
+const name = Air.getWarm('user.name');      // Read → 'John'
+
+// ─────────────────────────────────────────────────────────────
+// React Hook: Auto-update when storage changes
+// ─────────────────────────────────────────────────────────────
+function UserBadge() {
+  const [name, setName] = useState('');
+
+  useWarm({ keys: ['user.name'] }, (event) => {
+    setName(event.newValue as string);      // Re-renders on change
+  });
+
+  return <Text>{name}</Text>;
+}
+
+// ─────────────────────────────────────────────────────────────
+// Actions: Dispatch from anywhere, handle with sagas
+// ─────────────────────────────────────────────────────────────
+
+// Dispatch an action (works in components, interceptors, anywhere)
+Missile.dispatch({ type: 'auth/LOGIN', payload: { email, password } });
+
+// Handle actions with a saga
+function* loginSaga(action) {
+  const user = yield call(authApi.login, action.payload);
+  yield call(Air.setWarm, 'user.data', JSON.stringify(user));
+  yield put({ type: 'auth/LOGIN_SUCCESS' });
+}
+
+function* authWatcher() {
+  yield takeLatest('auth/LOGIN', loginSaga);
+}
+
+// Register at app startup
+Missile.runSaga(authWatcher);
 ```
+
+---
 
 ## Features
 
@@ -61,6 +102,7 @@ Air.setWarm('user.name', 'John');  // Stored AND reactive — that's it
 
 ## Table of Contents
 
+- [Usage](#usage)
 - [Installation](#installation)
 - [Quick Start](#quick-start)
 - [Warm Storage](#warm-storage)
