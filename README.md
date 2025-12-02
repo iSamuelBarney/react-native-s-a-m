@@ -24,7 +24,7 @@ A high-performance state management solution for React Native combining native C
 
 ## Why S.A.M?
 
-Traditional state managers (Redux, Zustand, Jotai, MobX) were built for web apps where state lives in memory. React Native apps need **persistent state**, **secure storage**, **relational data**, and **native performance**. S.A.M unifies all of this.
+Traditional state managers ([Redux](https://redux.js.org/), [Zustand](https://zustand-demo.pmnd.rs/), [Jotai](https://jotai.org/), [MobX](https://mobx.js.org/)) were built for web apps where state lives in memory. React Native apps need **persistent state**, **secure storage**, **relational data**, and **native performance**. S.A.M unifies all of this.
 
 ### S.A.M Exclusive Features
 
@@ -97,7 +97,7 @@ Missile.runSaga(authWatcher);
 - **Rate Limiting** — Built-in debounce and throttle support
 - **React Hooks** — `useWarm`, `useCold`, `useStorage`, `useSecure` for declarative usage
 - **Secure Storage** — iOS Keychain / Android Keystore integration with biometric auth
-- **Action System** — Redux-Saga inspired `Missile` for dispatching actions and managing async flows
+- **Action System** — [Redux-Saga](https://redux-saga.js.org/) inspired `Missile` for dispatching actions and managing async flows
 - **Native Storage Performance** — C++ storage implementation via [Nitro Modules](https://github.com/mrousavy/nitro)
 
 ## Table of Contents
@@ -522,7 +522,7 @@ function LoginScreen() {
 
 ## Missile (Action System)
 
-Missile is a lightweight Redux-Saga inspired action dispatch system. Dispatch actions from anywhere — components, utilities, API interceptors — and handle complex async flows with generator-based sagas.
+Missile is a lightweight [Redux-Saga](https://redux-saga.js.org/) inspired action dispatch system. Dispatch actions from anywhere — components, utilities, API interceptors — and handle complex async flows with generator-based sagas.
 
 ### Quick Start
 
