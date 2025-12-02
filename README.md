@@ -24,19 +24,15 @@ A high-performance state management solution for React Native combining native C
 
 ## Why S.A.M?
 
-Traditional state managers ([Redux](https://redux.js.org/), [Zustand](https://zustand-demo.pmnd.rs/), [Jotai](https://jotai.org/), [MobX](https://mobx.js.org/)) were built for web apps where state lives in memory. React Native apps need **persistent state**, **secure storage**, **relational data**, and **native performance**. S.A.M unifies all of this.
+S.A.M is a complete state management solution purpose-built for React Native. It combines **persistent storage**, **secure credentials**, **relational data**, and **action dispatch** into a single, cohesive package — no adapters, no middleware, no boilerplate.
 
-### S.A.M Exclusive Features
+### Key Benefits
 
-- **Native storage core** — C++ via Nitro for storage operations
-- **Built-in persistence** — No middleware or adapters
-- **Secure storage** — Keychain/Keystore with biometrics
-- **Reactive SQLite** — Cold storage with change listeners
-- **Pattern matching** — Watch `user.*` or `settings.*.enabled`
-- **Conditional triggers** — Fire on `greaterThan`, `contains`, etc.
-- **Built-in debounce/throttle** — No extra setup
-- **Zero hydration delay** — Instant startup
-- **Action system** — Redux-Saga inspired dispatch and sagas
+- **All-in-one** — Storage, secure credentials, SQLite, and action dispatch in one package
+- **Native performance** — C++ storage core via [Nitro Modules](https://github.com/mrousavy/nitro)
+- **Reactive by default** — Automatic updates when data changes, pattern matching, conditional triggers
+- **Works everywhere** — Dispatch actions from components, interceptors, utilities — no providers needed
+- **Zero setup** — Auto-initializing storage, no hydration delay, no boilerplate
 
 ---
 
@@ -86,19 +82,6 @@ function* authWatcher() {
 // Register at app startup
 Missile.runSaga(authWatcher);
 ```
-
----
-
-## Features
-
-- **Reactive Storage** — Automatic notifications on Warm and SQLite changes
-- **Pattern Matching** — Watch keys with glob patterns (`user.*`, `settings.*.enabled`)
-- **Conditional Triggers** — Fire only when conditions are met (equals, greaterThan, contains, etc.)
-- **Rate Limiting** — Built-in debounce and throttle support
-- **React Hooks** — `useWarm`, `useCold`, `useStorage`, `useSecure` for declarative usage
-- **Secure Storage** — iOS Keychain / Android Keystore integration with biometric auth
-- **Action System** — [Redux-Saga](https://redux-saga.js.org/) inspired `Missile` for dispatching actions and managing async flows
-- **Native Storage Performance** — C++ storage implementation via [Nitro Modules](https://github.com/mrousavy/nitro)
 
 ## Table of Contents
 
