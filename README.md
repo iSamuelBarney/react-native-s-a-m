@@ -20,50 +20,83 @@
 
 ---
 
-A high-performance Nitro Module for React Native that provides reactive listeners for Warm and Cold storage changes. Enables automatic component updates when storage changes — no polling, no boilerplate, just reactive persistence.
+A high-performance state management solution for React Native combining native C++ storage (via Nitro Modules) with a lightweight action dispatch system. Provides reactive Warm and Cold storage with automatic component updates, secure credential storage, and Redux-Saga inspired sagas for complex async flows — all in one package.
 
 ## Why S.A.M?
 
-Traditional state managers (Redux, Zustand, Jotai, MobX) were built for web apps where state lives in memory. React Native apps need **persistent state**, **secure storage**, **relational data**, and **native performance**. S.A.M unifies all of this.
+S.A.M is a complete state management solution purpose-built for React Native. It combines **persistent storage**, **secure credentials**, **relational data**, and **action dispatch** into a single, cohesive package — no adapters, no middleware, no boilerplate.
 
-### S.A.M Exclusive Features
+### Key Benefits
 
-- **Zero JS bundle** — Native C++ via Nitro
-- **Built-in persistence** — No middleware or adapters
-- **Secure storage** — Keychain/Keystore with biometrics
-- **Reactive SQLite** — Cold storage with change listeners
-- **Pattern matching** — Watch `user.*` or `settings.*.enabled`
-- **Conditional triggers** — Fire on `greaterThan`, `contains`, etc.
-- **Built-in debounce/throttle** — No extra setup
-- **Zero hydration delay** — Instant startup
+- **All-in-one** — Storage, secure credentials, SQLite, and action dispatch in one package
+- **Native performance** — C++ storage core via [Nitro Modules](https://github.com/mrousavy/nitro)
+- **Reactive by default** — Automatic updates when data changes, pattern matching, conditional triggers
+- **Works everywhere** — Dispatch actions from components, interceptors, utilities — no providers needed
+- **Zero setup** — Auto-initializing storage, no hydration delay, no boilerplate
 
-### Storage-Native Approach
+---
+
+## Usage
 
 ```typescript
-// Traditional: State + Persistence = Complexity
-// Redux: store → redux-persist → storage adapter → rehydration
+import { Air, Missile, useWarm } from 'react-native-s-a-m';
+const { takeLatest, call, put } = Missile;
 
-// S.A.M: Storage IS State
-Air.setWarm('user.name', 'John');  // Stored AND reactive — that's it
+// ─────────────────────────────────────────────────────────────
+// Storage: Read and write persistent state
+// ─────────────────────────────────────────────────────────────
+Air.setWarm('user.name', 'John');           // Write
+const name = Air.getWarm('user.name');      // Read → 'John'
+
+// ─────────────────────────────────────────────────────────────
+// React Hook: Auto-update when storage changes
+// ─────────────────────────────────────────────────────────────
+function UserBadge() {
+  const [name, setName] = useState('');
+
+  useWarm({ keys: ['user.name'] }, (event) => {
+    setName(event.newValue as string);      // Re-renders on change
+  });
+
+  return <Text>{name}</Text>;
+}
+
+// ─────────────────────────────────────────────────────────────
+// Actions: Dispatch from anywhere, handle with sagas
+// ─────────────────────────────────────────────────────────────
+
+// Dispatch an action (works in components, interceptors, anywhere)
+Missile.dispatch({ type: 'auth/LOGIN', payload: { email, password } });
+
+// Handle actions with a saga
+function* loginSaga(action) {
+  const user = yield call(authApi.login, action.payload);
+  yield call(Air.setWarm, 'user.data', JSON.stringify(user));
+  yield put({ type: 'auth/LOGIN_SUCCESS' });
+}
+
+function* authWatcher() {
+  yield takeLatest('auth/LOGIN', loginSaga);
+}
+
+// Register sagas by name — start and stop anytime
+Missile.register('auth', authWatcher);      // Start
+Missile.unregister('auth');                 // Stop
+Missile.isRegistered('auth');               // Check → true/false
+
+// Or run anonymously at app startup
+Missile.runSaga(authWatcher);
 ```
-
-## Features
-
-- **Reactive Storage** — Automatic notifications on Warm and SQLite changes
-- **Pattern Matching** — Watch keys with glob patterns (`user.*`, `settings.*.enabled`)
-- **Conditional Triggers** — Fire only when conditions are met (equals, greaterThan, contains, etc.)
-- **Rate Limiting** — Built-in debounce and throttle support
-- **React Hooks** — `useWarm`, `useCold`, `useStorage`, `useSecure` for declarative usage
-- **Secure Storage** — iOS Keychain / Android Keystore integration with biometric auth
-- **Native Performance** — C++ implementation via [Nitro Modules](https://github.com/mrousavy/nitro)
 
 ## Table of Contents
 
+- [Usage](#usage)
 - [Installation](#installation)
 - [Quick Start](#quick-start)
 - [Warm Storage](#warm-storage)
 - [Cold Storage](#cold-storage)
 - [Secure Storage](#secure-storage)
+- [Missile (Action System)](#missile-action-system)
 - [React Hooks](#react-hooks)
 - [API Overview](#api-overview)
 - [Documentation](#documentation)
@@ -475,6 +508,125 @@ function LoginScreen() {
 
 ---
 
+## Missile (Action System)
+
+Missile is a lightweight [Redux-Saga](https://redux-saga.js.org/) inspired action dispatch system. Dispatch actions from anywhere — components, utilities, API interceptors — and handle complex async flows with generator-based sagas.
+
+### Quick Start
+
+```typescript
+import { Missile, Air } from 'react-native-s-a-m';
+const { takeLatest, call, put } = Missile;
+
+// 1. Create a saga to handle actions
+function* loginSaga(action) {
+  const { email, password } = action.payload;
+
+  try {
+    const user = yield call(authApi.login, email, password);
+    yield call(Air.setWarm, 'auth.user', JSON.stringify(user));
+    yield call(Air.setWarm, 'auth.isAuthenticated', true);
+    yield put({ type: 'auth/LOGIN_SUCCESS', payload: user });
+  } catch (error) {
+    yield put({ type: 'auth/LOGIN_FAILURE', payload: error.message });
+  }
+}
+
+function* authWatcher() {
+  yield takeLatest('auth/LOGIN', loginSaga);
+}
+
+// 2. Register at app startup
+Missile.runSaga(authWatcher);
+
+// 3. Dispatch from anywhere
+Missile.dispatch({ type: 'auth/LOGIN', payload: { email, password } });
+```
+
+### Why Missile?
+
+- **One function** — `Missile.dispatch()` works anywhere, no hooks required
+- **No boilerplate** — No providers, no context, no setup
+- **Sagas handle logic** — Components stay dumb, business logic lives in sagas
+- **Works outside React** — Use in API interceptors, navigation, utilities
+
+### Dispatch Actions Anywhere
+
+```typescript
+// In a component
+function LoginButton() {
+  return (
+    <Button
+      title="Login"
+      onPress={() => Missile.dispatch({
+        type: 'auth/LOGIN',
+        payload: { email: 'user@example.com', password: 'secret' }
+      })}
+    />
+  );
+}
+
+// In an API interceptor
+axios.interceptors.response.use(null, (error) => {
+  if (error.response?.status === 401) {
+    Missile.dispatch({ type: 'auth/LOGOUT' });
+  }
+  return Promise.reject(error);
+});
+```
+
+### Named Saga Management
+
+Start and stop sagas dynamically — useful for screen-specific or feature-specific watchers:
+
+```typescript
+import { useFocusEffect } from '@react-navigation/native';
+
+function CheckoutScreen() {
+  useFocusEffect(
+    useCallback(() => {
+      // Start watcher when screen is focused
+      Missile.register('checkout-watcher', checkoutWatcher);
+
+      return () => {
+        // Stop when screen loses focus
+        Missile.unregister('checkout-watcher');
+      };
+    }, [])
+  );
+
+  return <CheckoutForm />;
+}
+
+// On logout, stop all watchers
+function* logoutSaga() {
+  yield call(Air.setWarm, 'auth.isAuthenticated', false);
+  Missile.unregisterAll();
+}
+```
+
+### Available Effects
+
+| Effect | Description | Example |
+|--------|-------------|---------|
+| `call` | Call a function (blocking) | `yield call(api.login, email, pw)` |
+| `put` | Dispatch another action | `yield put({ type: 'SUCCESS' })` |
+| `take` | Wait for specific action | `yield take('LOGIN_SUCCESS')` |
+| `takeEvery` | Handle every matching action | `yield takeEvery('FETCH', handler)` |
+| `takeLatest` | Handle latest only (cancel prev) | `yield takeLatest('SEARCH', handler)` |
+| `fork` | Non-blocking call | `yield fork(backgroundSync)` |
+| `spawn` | Detached fork (errors don't propagate) | `yield spawn(analytics)` |
+| `cancel` | Cancel a forked task | `yield cancel(task)` |
+| `race` | First to complete wins | `yield race({ res, timeout })` |
+| `all` | Wait for all to complete | `yield all([task1, task2])` |
+| `delay` | Wait for duration | `yield delay(1000)` |
+| `debounce` | Debounce handler | `yield debounce(500, 'SEARCH', fn)` |
+| `throttle` | Throttle handler | `yield throttle(1000, 'SCROLL', fn)` |
+
+For complete documentation, see **[Missile Design Guide](./docs/MISSILE_DESIGN.md)** and **[Missile API Reference](./docs/MISSILE_API.md)**.
+
+---
+
 ## React Hooks
 
 ### useWarm — Watch Warm Changes
@@ -629,6 +781,31 @@ function UserOrders() {
 | `SecureStorage.delete(options?)` | Delete credentials |
 | `SecureStorage.getSupportedBiometryType()` | Get biometry type |
 
+### Missile (Action System)
+
+| Method | Description |
+|--------|-------------|
+| `Missile.dispatch(action)` | Dispatch action to all sagas |
+| `Missile.runSaga(saga)` | Start a saga |
+| `Missile.register(name, saga)` | Register named saga |
+| `Missile.unregister(name)` | Stop named saga |
+| `Missile.isRegistered(name)` | Check if saga is running |
+| `Missile.unregisterAll()` | Stop all named sagas |
+
+### Missile Effects
+
+| Effect | Description |
+|--------|-------------|
+| `call(fn, ...args)` | Call function (blocking) |
+| `put(action)` | Dispatch action |
+| `take(pattern)` | Wait for action |
+| `takeEvery(pattern, saga)` | Handle every action |
+| `takeLatest(pattern, saga)` | Handle latest action |
+| `fork(saga)` | Non-blocking call |
+| `race({ key: effect })` | First to complete wins |
+| `all([effects])` | Wait for all |
+| `delay(ms)` | Wait for duration |
+
 ### Constants
 
 | Constant | Values | Description |
@@ -705,6 +882,8 @@ For complete documentation including production patterns, custom endpoints, and 
 | [Conditions](./docs/CONDITIONS.md) | Conditional trigger reference |
 | [Secure Storage](./docs/SECURE_STORAGE.md) | Keychain/Keystore guide |
 | [Network Monitoring](./docs/NETWORK.md) | Network state and quality guide |
+| [Missile Design Guide](./docs/MISSILE_DESIGN.md) | Action system patterns and examples |
+| [Missile API Reference](./docs/MISSILE_API.md) | Complete Missile API documentation |
 | [MFE State Tracking](./docs/MFE.md) | Micro-frontend state tracking |
 | [Architecture](./docs/ARCHITECTURE.md) | Technical architecture overview |
 

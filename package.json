@@ -1,7 +1,7 @@
 {
   "name": "react-native-s-a-m",
   "version": "1.0.17",
-  "description": "S.A.M - State Awareness Manager - Reactive listeners for MMKV and SQLite storage",
+  "description": "S.A.M - State Awareness Manager - Reactive storage with MMKV/SQLite and Redux-Saga inspired action dispatch",
   "main": "./dist/index.js",
   "types": "./dist/index.d.ts",
   "scripts": {
@@ -19,7 +19,10 @@
     "reactive",
     "nitro-module",
     "keychain",
-    "secure-storage"
+    "secure-storage",
+    "saga",
+    "action-dispatch",
+    "redux-saga"
   ],
   "repository": {
     "type": "git",
