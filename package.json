@@ -1,6 +1,6 @@
 {
   "name": "react-native-s-a-m",
-  "version": "1.0.17",
+  "version": "1.0.18",
   "description": "S.A.M - State Awareness Manager - Reactive storage with MMKV/SQLite and Redux-Saga inspired action dispatch",
   "main": "./dist/index.js",
   "types": "./dist/index.d.ts",
