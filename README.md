@@ -79,7 +79,12 @@ function* authWatcher() {
   yield takeLatest('auth/LOGIN', loginSaga);
 }
 
-// Register at app startup
+// Register sagas by name — start and stop anytime
+Missile.register('auth', authWatcher);      // Start
+Missile.unregister('auth');                 // Stop
+Missile.isRegistered('auth');               // Check → true/false
+
+// Or run anonymously at app startup
 Missile.runSaga(authWatcher);
 ```
 
